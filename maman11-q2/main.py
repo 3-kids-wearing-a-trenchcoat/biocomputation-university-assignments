@@ -1,0 +1,13 @@
+import gui
+import EcoWorld as ew
+import numpy.random
+
+# constants
+SEED = 123
+RNG = numpy.random.default_rng(SEED)
+
+if __name__ == "__main__":
+    world = ew.EcoWorld(RNG)
+    # gui = gui.MainWindow(world)
+    # gui.run()
+    gui.run(world)
