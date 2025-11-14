@@ -15,7 +15,7 @@ class EcoWorld:
         self.surface = Surface(rnd_gen, size)
         self.water = Water(self.surface)
         # Data trackers
-        self.sea_level = np.empty(INITIAL_HISTORY_SIZE, dtype=np.int8)
+        self.sea_level = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.int8)
         self.sea_level_ptr = 0
 
     @staticmethod
@@ -63,8 +63,8 @@ class EcoWorld:
         """
         water_pos = self.water.get_water_position()
         h, w = water_pos.shape
-        map = np.zeros((h, w, 4), dtype=np.uint8)
-        map[water_pos] = LIGHT_BLUE
-        map[~water_pos] = BROWN
+        output = np.zeros((h, w, 4), dtype=np.uint8)
+        output[water_pos] = LIGHT_BLUE
+        output[~water_pos] = BROWN
 
-        return map
+        return output
