@@ -5,9 +5,9 @@ from numpy.typing import NDArray
 import tqdm
 
 # constants
-DEFAULT_SIZE = 500
-DEFAULT_LAND_PORTION = 0.4
-DEFAULT_LAND_ASPECT_RATIO = 2
+DEFAULT_SIZE = 1000
+DEFAULT_LAND_PORTION = 0.3
+DEFAULT_LAND_ASPECT_RATIO = 1.1
 INT8_MIN = -128
 INT8_MAX = 127
 
@@ -36,8 +36,8 @@ class Surface:
         land_bottom = (mid_point + (land_height // 2) + 1).astype(np.int64)
         land_left = (mid_point - (land_width // 2)).astype(np.int64)
         land_right = (mid_point + (land_width // 2) + 1).astype(np.int64)
-        land = self.mat[land_top:land_bottom, land_left:land_right]
-        land = np.ones(land.shape)
+        land = self.mat[land_left:land_right, land_top:land_bottom]
+        land *= -1
 
     def get_height_mask(self, below:int=INT8_MAX, above:int=INT8_MIN) -> NDArray[np.bool]:
         """Return a mask where a cell is true if it is lower than 'below' (inclusive) and higher than 'above' (exclusive)"""
@@ -82,3 +82,6 @@ class Water:
 
     def get_water_position(self) -> np.typing.NDArray[np.bool]:
         return self.water_quantity > 0
+
+    def average_sea_level(self) -> float:
+        return self.height_with_water[self.get_water_position()].mean()
