@@ -2,21 +2,25 @@ from __future__ import annotations
 from numba import njit
 import numpy as np
 import pyqtgraph as pg
-# try:
-#     from PyQt6 import QtWidgets, QtCore, QtGui, QApplication
-#     from pyqtgraph.Qt import mkQApp
-# except ImportError:
-#     from pyqtgraph.Qt import QtWidgets, QtCore, QtGui, mkQApp
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pyqtgraph.Qt import mkQApp
+from pyqtgraph.widgets import RemoteGraphicsView, GraphicsLayoutWidget
 import pyqtgraph.opengl as gl
 import EcoWorld as ew
 
 class MainWindow (QtWidgets.QMainWindow):
     """pyqtgraph-based GUI"""
+    def update(self) -> None:
+        next(self.world) # advance world
+        self.map.setImage(self.world.get_map()) # set map
+        # set sea level plot
+        # self.sea_level_curve.setData(self.world.sea_level_history())
+        self.sea_level_plot.plot(self.world.sea_level_history(), clear=True, _callSync='off')
+
     def __init__(self, world: ew.EcoWorld):
         # initialize simulation variables
         self.world = world
+        self.milliseconds_per_iteration = 0 # '0' means we update as fast as possible
         # initialize GUI
         super(MainWindow, self).__init__()
         win = pg.GraphicsLayoutWidget(show=True)
@@ -37,11 +41,16 @@ class MainWindow (QtWidgets.QMainWindow):
         # sea level
         self.tracker_layout.nextRow()
         # self.sea_level_view = self.tracker_layout.addViewBox()
-        self.sea_level = self.tracker_layout.addPlot(title="Average sea level")
-        self.sea_level_curve = self.sea_level.plot(self.world.sea_level[:self.world.sea_level_ptr])
+        self.sea_level_plot = self.tracker_layout.addPlot(title="Average sea level")
+        # self.sea_level_plot.setClipToView(True)
+        # self.sea_level_plot.setDownsampling(mode='peak')
+        self.sea_level_curve = self.sea_level_plot.plot(self.world.sea_level[:self.world.sea_level_ptr])
 
-    def update(self) -> None:
-        # TODO: implement update (apply next(world), update world & trackers
+        # timer (for plot update)
+        self.timer = pg.QtCore.QTimer()
+        self.timer.timeout.connect(self.update)
+        self.timer.start(self.milliseconds_per_iteration)
+
 
 
 def run(world: ew.EcoWorld) -> None:

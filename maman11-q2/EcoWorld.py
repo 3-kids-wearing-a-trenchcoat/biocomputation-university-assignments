@@ -62,9 +62,13 @@ class EcoWorld:
         :return: 4D np.uint8 matrix representing RGBA values
         """
         water_pos = self.water.get_water_position()
+        terrain = self.surface.mat
         h, w = water_pos.shape
         output = np.zeros((h, w, 4), dtype=np.uint8)
         output[water_pos] = LIGHT_BLUE
         output[~water_pos] = BROWN
 
         return output
+
+    def sea_level_history(self):
+        return self.sea_level[:self.sea_level_ptr]

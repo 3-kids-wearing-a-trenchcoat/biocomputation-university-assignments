@@ -6,13 +6,24 @@ import tqdm
 
 # constants
 DEFAULT_SIZE = 1000
-DEFAULT_LAND_PORTION = 0.3
-DEFAULT_LAND_ASPECT_RATIO = 1.5
+DEFAULT_LAND_PORTION = 0.25
+DEFAULT_LAND_ASPECT_RATIO = 1.3
 INT8_MIN = -128
 INT8_MAX = 127
 
 class Surface:
     """Representing the world surface, each cell is described by surface elevation relative to some initial sea level"""
+
+    def randomize_surface(self, fluctuation:int=1):
+        # TODO: this is ass, but will do for now, I'm behind schedule
+        avg_neighborhood = self.mat.copy()
+        for shift, axis in [(-1,0), (1,0), (-1,1), (1,1)]:
+            avg_neighborhood += np.roll(self.mat, shift, axis)
+        avg_neighborhood //= 5
+        change = self.rnd_gen.integers(avg_neighborhood - fluctuation, avg_neighborhood +
+                                       fluctuation + 1, avg_neighborhood.shape)
+        self.mat += change
+
 
     def __init__(self, rnd_gen:np.random.Generator, size: int = DEFAULT_SIZE,
                  land_portion: float=DEFAULT_LAND_PORTION, land_aspect_ratio:float = DEFAULT_LAND_ASPECT_RATIO):
@@ -23,14 +34,12 @@ class Surface:
         :param land_portion: fraction of the surface taken up by land (defaults to DEFAULT_LAND_PORTION)
         :param land_aspect_ratio: ratio of land width to length height (defaults to DEFAULT_LAND_ASPECT_RATIO)
         """
-        # self.mat = np.zeros((size, size), dtype=np.int8)
-        self.mat = np.ones((size, size)) * -1
+        self.rnd_gen = rnd_gen
+        self.mat = np.ones((size, size)) * -2
         land_quantity = np.floor(size * size * land_portion)
 
         land_width = np.floor(np.sqrt(land_quantity * land_aspect_ratio))
         land_height = np.floor(np.sqrt(land_quantity / land_aspect_ratio))
-        # land_height = np.floor(land_quantity * land_portion / land_aspect_ratio)
-        # land_width = land_height * land_aspect_ratio
         mid_point = size // 2
         land_top = (mid_point - (land_height // 2)).astype(np.int64)
         land_bottom = (mid_point + (land_height // 2) + 1).astype(np.int64)
@@ -38,6 +47,12 @@ class Surface:
         land_right = (mid_point + (land_width // 2) + 1).astype(np.int64)
         land = self.mat[land_left:land_right, land_top:land_bottom]
         land *= -1
+        # At this point, all land is of value 1 and all water is of value -1
+        # # generate something like mountains
+        mountain_x, mountain_y = rnd_gen.integers(0, land.shape[0]+1), rnd_gen.integers(0, land.shape[1]+1)
+        land[mountain_x][mountain_y] = 100
+        [self.randomize_surface(3) for i in range(4)]
+
 
     def get_height_mask(self, below:int=INT8_MAX, above:int=INT8_MIN) -> NDArray[np.bool]:
         """Return a mask where a cell is true if it is lower than 'below' (inclusive) and higher than 'above' (exclusive)"""
@@ -54,6 +69,7 @@ class Water:
         self.height_with_water = surface.mat.copy()
         self.height_with_water[has_water] = 0
         self.water_quantity = np.where(self.height_with_water > self.surface.mat, self.height_with_water - self.surface.mat, 0)
+        # self.water_quantity[0:1000][0:350] += 110
 
     def directional_equalize(self, i:int, axis:int) -> None:
         """apply flow in the direction (i,axis),
@@ -66,7 +82,6 @@ class Water:
         # update changes
         self.height_with_water += change
         self.water_quantity += change
-
 
     def equalize(self):
         """Take a step towards equalizing all water tiles
