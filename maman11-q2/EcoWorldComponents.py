@@ -15,7 +15,7 @@ SURFACE_STATES = 20
 # component-specific constants
 DEFAULT_LAND_PORTION = 0.3 # portion of the surface that is made up of (initially) dry land
 DEFAULT_FOREST_COVERAGE = 0.4 # portion of dry land covered by forest
-DEFAULT_FOREST_GERMINATION = 200 # maximum number of cells from germination center for forest
+DEFAULT_FOREST_GERMINATION = 50 # maximum number of cells from germination center for forest
 DEFAULT_INDUSTRY_GERM_LIMIT = 3
 DEFAULT_INDUSTRY_QUANTITY = 500 # number of cells on dry land to be designated as industrial tiles
 DEFAULT_WIND_SPAWN_RANGE = 150 # distance from horizontal middle in which wind spawn when a cell neighborhood is calm

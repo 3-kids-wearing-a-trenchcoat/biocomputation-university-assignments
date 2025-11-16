@@ -1,4 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
 from EcoWorldComponents import *
+import atexit
 
 # constants
 INITIAL_HISTORY_SIZE = 100
@@ -21,6 +23,9 @@ class EcoWorld:
         # Data trackers
         self.sea_level = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.int8)
         self.sea_level_ptr = 0
+        # initialize parallelism
+        self.executor = ThreadPoolExecutor(max_workers=4)
+        atexit.register(self.executor.shutdown, wait=True)
 
     @staticmethod
     def double_array_size(a:np.typing.NDArray) -> np.typing.NDArray:
@@ -44,11 +49,17 @@ class EcoWorld:
         return self
 
     def __next__(self):
+        comp_names = ["water", "wind", "forest", "industry"]
+        futures = {name: self.executor.submit(next, getattr(self, name))
+                   for name in comp_names}
+        for name, fut in futures.items():
+            setattr(self, name, fut.result())
         # advance components by one step
-        self.water = next(self.water)
-        self.wind = next(self.wind)
-        self.forest = next(self.forest)
-        self.industry = next(self.industry)
+        # self.water = next(self.water)
+        # self.wind = next(self.wind)
+        # self.forest = next(self.forest)
+        # self.industry = next(self.industry)
+
         # update points of components to components
         self.update_component_pointers()
         # update trackers
