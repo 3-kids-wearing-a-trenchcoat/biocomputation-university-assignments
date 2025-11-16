@@ -1,6 +1,4 @@
 from __future__ import annotations
-from numba import njit
-import numpy as np
 import pyqtgraph as pg
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pyqtgraph.Qt import mkQApp
@@ -14,7 +12,6 @@ class MainWindow (QtWidgets.QMainWindow):
         next(self.world) # advance world
         self.map.setImage(self.world.get_map()) # set map
         # set sea level plot
-        # self.sea_level_curve.setData(self.world.sea_level_history())
         self.sea_level_plot.plot(self.world.sea_level_history(), clear=True, _callSync='off')
 
     def __init__(self, world: ew.EcoWorld):
@@ -27,6 +24,7 @@ class MainWindow (QtWidgets.QMainWindow):
         self.setCentralWidget(win)
         self.setWindowTitle("Pollution CA simulation")
         self.show()
+
         # set map
         self.map_layout = win.addLayout()
         self.map_layout.addLabel("world map")
@@ -42,8 +40,8 @@ class MainWindow (QtWidgets.QMainWindow):
         self.tracker_layout.nextRow()
         # self.sea_level_view = self.tracker_layout.addViewBox()
         self.sea_level_plot = self.tracker_layout.addPlot(title="Average sea level")
-        # self.sea_level_plot.setClipToView(True)
-        # self.sea_level_plot.setDownsampling(mode='peak')
+        self.sea_level_plot.setClipToView(True)
+        self.sea_level_plot.setDownsampling(mode='peak')
         self.sea_level_curve = self.sea_level_plot.plot(self.world.sea_level[:self.world.sea_level_ptr])
 
         # cross-hair, for inspecting each cell's value

@@ -8,16 +8,16 @@ import copy
 from collections import deque
 
 # constants
-DEFAULT_SIZE = 1000
+DEFAULT_SIZE = 500
 INT8_MIN = -128
 INT8_MAX = 127
 SURFACE_STATES = 20
 # component-specific constants
 DEFAULT_LAND_PORTION = 0.3 # portion of the surface that is made up of (initially) dry land
 DEFAULT_FOREST_COVERAGE = 0.4 # portion of dry land covered by forest
-DEFAULT_FOREST_GERMINATION = 100 # maximum number of cells from germination center for forest
-# DEFAULT_INDUSTRY_COVERAGE = 0.01 # portion of dry land covered by industrial tiles
-DEFAULT_INDUSTRY_QUANTITY = 200 # number of cells on dry land to be designated as industrial tiles
+DEFAULT_FOREST_GERMINATION = 200 # maximum number of cells from germination center for forest
+DEFAULT_INDUSTRY_GERM_LIMIT = 3
+DEFAULT_INDUSTRY_QUANTITY = 500 # number of cells on dry land to be designated as industrial tiles
 DEFAULT_WIND_SPAWN_RANGE = 150 # distance from horizontal middle in which wind spawn when a cell neighborhood is calm
 
 class Surface:
@@ -224,8 +224,22 @@ class Forest:
 
 class Industry:
     """Representing industrial tiles which spew pollution"""
+    def germinate_industry(self, x:int, y:int, limit:int,
+                           land_map:NDArray[np.bool], forest_map:NDArray[np.bool]) -> int:
+        if limit <= 0 or not land_map[x][y]:
+            return 0
+        self.mat[x][y] = True
+        # self.land_coords.remove((x,y))
+        new_industry_tiles = 1
+        for new_x, new_y in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            new_x, new_y = new_x % self.mat.shape[0], new_y % self.mat.shape[1]
+            if self.mat[new_x][new_y] or forest_map[new_x][new_y]:
+                continue
+            new_industry_tiles += self.germinate_industry(new_x, new_y, limit - 1, land_map, forest_map)
+        return new_industry_tiles
+
     def __init__(self, rnd_gen:np.random.Generator, surface:Surface, water:Water, forest:Forest,
-                 num:int=DEFAULT_INDUSTRY_QUANTITY):
+                 num:int=DEFAULT_INDUSTRY_QUANTITY, germ_limit:int=DEFAULT_INDUSTRY_GERM_LIMIT):
         self.water = water
         self.mat = np.zeros(surface.mat.shape, dtype=np.bool)
         land_map = np.where(water.mat - surface.mat <= 0, True, False).astype(np.bool)
@@ -236,10 +250,13 @@ class Industry:
             total = 0
             while total < num:
                 x, y = rnd_gen.choice(self.free_coords)
-                self.mat[x][y] = True
-                self.free_coords.remove((x,y))
-                total += 1
-                pbar.update(1)
+                # self.mat[x][y] = True
+                # self.free_coords.remove((x,y))
+                # total += 1
+                # pbar.update(1)
+                new_tiles = self.germinate_industry(x, y, germ_limit, land_map, forest.mat)
+                pbar.update(new_tiles)
+                total += new_tiles
         self.free_coords = None
 
     def __iter__(self):
