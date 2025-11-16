@@ -14,6 +14,7 @@ class EcoWorld:
         # Initialize components
         self.surface = Surface(rnd_gen, size)
         self.water = Water(self.surface)
+        self.wind = Wind(self.water)
         # Data trackers
         self.sea_level = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.int8)
         self.sea_level_ptr = 0
@@ -31,15 +32,19 @@ class EcoWorld:
         if self.sea_level_ptr == self.sea_level.shape[0]:
             self.sea_level = self.double_array_size(self.sea_level)
 
+    def update_component_pointers(self):
+        self.wind.update_components(self.water)
+
     def __iter__(self):
         return self
 
     def __next__(self):
         # advance components by one step
-        next(self.water)
+        self.water = next(self.water)
+        # update points of components to components
+        self.update_component_pointers()
         # update trackers
         self.update_trackers()
-
         return self
 
     def get_water_grid(self) -> NDArray[np.uint8]:
