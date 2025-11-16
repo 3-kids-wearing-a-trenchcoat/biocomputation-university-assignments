@@ -1,11 +1,8 @@
 from __future__ import annotations
-from numba import jit, int8, bool, float32, float64
-from numba.experimental import jitclass
 import numpy as np
 from numpy.typing import NDArray
 from tqdm import tqdm
 import copy
-from collections import deque
 
 # constants
 DEFAULT_SIZE = 500
