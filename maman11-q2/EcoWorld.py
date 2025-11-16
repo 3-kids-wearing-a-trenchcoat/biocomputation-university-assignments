@@ -7,6 +7,7 @@ LIGHT_BLUE = (0, 150, 255, 255)
 BLACK = (0, 0, 0, 255)
 BROWN = (101, 67, 33, 255)
 GREEN = (0, 255, 0, 255)
+RED = (255, 0, 0, 255)
 
 class EcoWorld:
     """Aggregation of all EcoWorldComponent classes into a single iterable class"""
@@ -14,7 +15,9 @@ class EcoWorld:
         # Initialize components
         self.surface = Surface(rnd_gen, size)
         self.water = Water(self.surface)
-        self.wind = Wind(self.water)
+        self.wind = Wind(rnd_gen, self.water)
+        self.forest = Forest(rnd_gen, self.surface, self.water)
+        self.industry = Industry(rnd_gen, self.surface, self.water, self.forest)
         # Data trackers
         self.sea_level = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.int8)
         self.sea_level_ptr = 0
@@ -34,6 +37,8 @@ class EcoWorld:
 
     def update_component_pointers(self):
         self.wind.update_components(self.water)
+        self.forest.update_components(self.water)
+        self.industry.update_components(self.water)
 
     def __iter__(self):
         return self
@@ -41,6 +46,9 @@ class EcoWorld:
     def __next__(self):
         # advance components by one step
         self.water = next(self.water)
+        self.wind = next(self.wind)
+        self.forest = next(self.forest)
+        self.industry = next(self.industry)
         # update points of components to components
         self.update_component_pointers()
         # update trackers
@@ -67,12 +75,12 @@ class EcoWorld:
         :return: 4D np.uint8 matrix representing RGBA values
         """
         water_pos = self.water.get_water_position()
-        terrain = self.surface.mat
         h, w = water_pos.shape
         output = np.zeros((h, w, 4), dtype=np.uint8)
         output[water_pos] = LIGHT_BLUE
         output[~water_pos] = BROWN
-
+        output[self.forest.mat] = GREEN
+        output[self.industry.mat] = RED
         return output
 
     def sea_level_history(self):

@@ -46,6 +46,8 @@ class MainWindow (QtWidgets.QMainWindow):
         # self.sea_level_plot.setDownsampling(mode='peak')
         self.sea_level_curve = self.sea_level_plot.plot(self.world.sea_level[:self.world.sea_level_ptr])
 
+        # cross-hair, for inspecting each cell's value
+        # TODO
         # timer (for plot update)
         self.timer = pg.QtCore.QTimer()
         self.timer.timeout.connect(self.update)
