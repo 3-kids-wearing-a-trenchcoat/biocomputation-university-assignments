@@ -3,7 +3,7 @@ import pyqtgraph as pg
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pyqtgraph.Qt import mkQApp
 from pyqtgraph.widgets import RemoteGraphicsView, GraphicsLayoutWidget
-import pyqtgraph.opengl as gl
+# import pyqtgraph.opengl as gl
 import EcoWorld as ew
 
 class MainWindow (QtWidgets.QMainWindow):
@@ -13,6 +13,8 @@ class MainWindow (QtWidgets.QMainWindow):
         self.map.setImage(self.world.get_map()) # set map
         # set sea level plot
         self.sea_level_plot.plot(self.world.sea_level_history(), clear=True, _callSync='off')
+        self.pollution_plot.plot(self.world.pollution_history(), clear=True, _callSync='off')
+
 
     def __init__(self, world: ew.EcoWorld):
         # initialize simulation variables
@@ -38,11 +40,16 @@ class MainWindow (QtWidgets.QMainWindow):
         self.tracker_layout.addLabel("Data")
         # sea level
         self.tracker_layout.nextRow()
-        # self.sea_level_view = self.tracker_layout.addViewBox()
         self.sea_level_plot = self.tracker_layout.addPlot(title="Average sea level")
         self.sea_level_plot.setClipToView(True)
         self.sea_level_plot.setDownsampling(mode='peak')
-        self.sea_level_curve = self.sea_level_plot.plot(self.world.sea_level[:self.world.sea_level_ptr])
+        self.sea_level_curve = self.sea_level_plot.plot(self.world.sea_level_history())
+        # total pollution
+        self.tracker_layout.nextRow()
+        self.pollution_plot = self.tracker_layout.addPlot(title="Total pollution")
+        self.pollution_plot.setClipToView(True)
+        self.pollution_plot.setDownsampling(mode='peak')
+        self.pollution_curve = self.pollution_plot.plot(self.world.pollution_history())
 
         # cross-hair, for inspecting each cell's value
         # TODO
