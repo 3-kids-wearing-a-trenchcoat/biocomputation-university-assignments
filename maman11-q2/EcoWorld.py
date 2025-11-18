@@ -15,7 +15,7 @@ GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 PURPLE = (128, 0, 128)
 # PURPLE = (191, 64, 191)
-OVERLAY_COLOR_ALPHA = 0.4
+OVERLAY_COLOR_ALPHA = 0.5
 
 class EcoWorld:
     """Aggregation of all EcoWorldComponent classes into a single iterable class"""
@@ -133,6 +133,9 @@ class EcoWorld:
         output[self.industry.mat] = RED
         if self.show_pollution_toggle:
             output = self.overlay_color(output, self.pollution.mat, PURPLE)
+        # where_pollution = self.pollution.mat > 0
+        # output[where_pollution] = (output[where_pollution] / (1 - OVERLAY_COLOR_ALPHA) +
+        #                            np.full_like(output[where_pollution], PURPLE) * OVERLAY_COLOR_ALPHA)
         return output
 
     def sea_level_history(self):
