@@ -9,18 +9,17 @@ DEFAULT_SIZE = 500
 INT8_MIN = -128
 INT8_MAX = 127
 UINT8_MAX = 255
-SURFACE_STATES = 9
+SURFACE_STATES = 4
 # component-specific constants
 DEFAULT_LAND_PORTION = 0.3 # portion of the surface that is made up of (initially) dry land
 DEFAULT_FOREST_COVERAGE = 0.4 # portion of dry land covered by forest
 DEFAULT_FOREST_GERMINATION = 50 # maximum number of cells from germination center for forest
 DEFAULT_INDUSTRY_GERM_LIMIT = 3
-DEFAULT_INDUSTRY_QUANTITY = 1000 # number of cells on dry land to be designated as industrial tiles
-DEFAULT_WIND_SPAWN_RANGE = 150 # distance from horizontal middle in which wind spawn when a cell neighborhood is calm
-DEFAULT_POLLUTION_RATE = 150 # how much pollution each industry tile spawns at each iteration
+DEFAULT_INDUSTRY_QUANTITY = 50 # number of cells on dry land to be designated as industrial tiles
+DEFAULT_POLLUTION_RATE = 10 # how much pollution each industry tile spawns at each iteration
 DEFAULT_FOREST_CLEANING_RATE = 5 # how much pollution each forest tile removes at each iteration
 START_POLLUTION = 0 # how much pollution should each cell start out with, mostly for debugging
-WIND_STATES = 4 # maximum wind speed in any direction
+WIND_STATES = 20 # maximum wind speed in any direction
 
 class Surface:
     """Representing the world surface, each cell is described by surface elevation relative to some initial sea level"""
@@ -109,7 +108,6 @@ class Water:
         water_pos = self.get_water_position()
         return self.mat[water_pos].mean()
 
-
 class Wind:
     """
     Representation of wind.
@@ -121,135 +119,121 @@ class Wind:
     The central strip of the world will also generate wind if all neighbors are calm, to avoid a stable,
     completely calm state and to simulate wind resulting in the world's rotation at the (roughly) equator
     """
-    def __init__(self, rnd_gen:np.random.Generator, water:Water,
-                 spawn_range:int=DEFAULT_WIND_SPAWN_RANGE):
+    def __init__(self, rnd_gen:np.random.Generator, water:Water):
         """
         Create Wind cellular automata
         :param rnd_gen: numpy random number generator, should be shared by all components for consistency
         :param water: Water object
-        :param spawn_range: distance from horizontal center in which cells whose neighborhood is calm spawn new wind
         """
+        # initialize core variables
         self.water = water # water is used for the surface as elevation changes dictate wind erosion
                            # water can change elevation in this CA, surface remains static
-        self.mat = np.zeros((water.mat.shape[0], water.mat.shape[1], 2), dtype=np.int16)
-        # self.wind_generation_range = (1 * (water.mat.shape[1] // 3), 2 * (water.mat.shape[1] // 3))
-        # generation_range = [(self.mat.shape[1] // 2) - spawn_range, (self.mat.shape[1] // 2) + spawn_range]
-        # self.gen_mask = np.zeros((water.mat.shape[0], water.mat.shape[1]), dtype=np.bool)
-        # self.gen_mask[generation_range[0] : generation_range[1], :] = True
-        # propagation direction matrices, will make propagation calculations easier
+        self.sn = np.zeros((water.mat.shape[0], water.mat.shape[1]), dtype=np.int16) # south-north wind
+        self.ew = np.zeros_like(self.sn) # east-west wind
+        self.vert = True # whether the wind in this iteration is vertical (sn) or horizontal (ew)
+        self.alpha = 0.2 # diffusion rate of wind
+        # pseudo-random wind spawning variables kind-of sort-of modeled after real world wind movement
+        self.sixth = 0
+        new_str = 10
+        self.new_wind = {0: (new_str, -new_str),
+                         1: (-new_str, new_str),
+                         2: (new_str, -new_str),
+                         3: (-new_str, -new_str),
+                         4: (new_str, new_str),
+                         5: (-new_str, -new_str)}
+        self.sixth_length = self.sn.shape[0] // 6
+        self.add_new_wind = True
+        # propagation direction matrices, will make propagation calculations less costly
         self.move_n = np.zeros(self.water.mat.shape, dtype=np.bool)
         self.move_s = np.zeros(self.water.mat.shape, dtype=np.bool)
         self.move_e = np.zeros(self.water.mat.shape, dtype=np.bool)
         self.move_w = np.zeros(self.water.mat.shape, dtype=np.bool)
-        # pseudo-random wind spawning variables kind-of sort-of modeled after real world wind movement
-        self.option_one: bool = True
-        self.sixth = 0
-        self.new_wind = {0: [(1, 0), (0, -1)],
-                         1: [(0, 1), (-1, 0)],
-                         2: [(-1, 0), (0, -1)],
-                         3: [(-1, 0), (0, -1)],
-                         4: [(0, 1), (-1, 0)],
-                         5: [(-1, 0), (0, -1)]}
-        self.sixth_length = self.mat.shape[0] // 6
-        # self.new_wind_ptr = 0
-        # self.new_wind = [np.array([0,1]), np.array([1,0]), np.array([0,-1]), np.array([-1,0])]
 
-    def spawn_wind(self) -> NDArray:
-        output = np.zeros_like(self.mat)
-        # find all cells where the cell and its neighbors are all equal to 0
-        calm = np.logical_and(self.mat[..., 0] == 0, self.mat[..., 1] == 0)
-        calm_area = (calm & np.roll(calm, 1, 0) & np.roll(calm, -1, 0) &
-                     np.roll(calm, 1, 1) & np.roll(calm, -1, 1))
-        # generate mask representing which sixth (divided horizontally, top-to-bottom) should generate, if at all
-        spawn_mask = np.zeros(calm.shape, dtype=np.bool)
+    def spawn_wind(self) -> tuple[NDArray[np.int16], NDArray[np.int16]]:
+        output_sn = np.zeros_like(self.sn, dtype=np.int16)
+        output_ew = np.zeros_like(self.ew, dtype=np.int16)
+        # # find all cells where the cell and its neighbors are all equal to 0
+        # calm = np.logical_and(self.sn == 0, self.ew == 0)
+        # calm_area = (calm & np.roll(calm, 1, 0) & np.roll(calm, -1, 0) &
+        #              np.roll(calm, 1, 1) & np.roll(calm, -1, 1))
+        # # generate mask representing which sixth (divided horizontally, top-to-bottom) should generate, if at all
+        # spawn_mask = np.zeros(calm.shape, dtype=np.bool)
+        # spawn_start = self.sixth_length * self.sixth
+        # spawn_end = spawn_start + self.sixth_length
+        # spawn_mask[spawn_start : spawn_end] = True
+        # # limit spawn to areas in the current sixth which are calm
+        # spawn_mask = spawn_mask & calm_area
+        # # spawn appropriate wind
+        # output_sn[spawn_mask] = np.full_like(output_sn[spawn_mask], self.new_wind[self.sixth][0])
+        # output_ew[spawn_mask] = np.full_like(output_ew[spawn_mask], self.new_wind[self.sixth][1])
+        # self.sixth = self.sixth + 1 if self.sixth < 5 else 0
+        # return output_sn, output_ew
+        spawn_mask = np.zeros(output_sn.shape, dtype=bool)
         spawn_start = self.sixth_length * self.sixth
         spawn_end = spawn_start + self.sixth_length
         spawn_mask[spawn_start : spawn_end] = True
-        # limit spawn to areas in the current sixth which are calm
-        spawn_mask = spawn_mask & calm_area
-        # spawn appropriate wind
-        output[spawn_mask] = self.new_wind.get(self.sixth)[self.option_one]
-        self.sixth += 1
-        self.option_one = not self.option_one
-        if self.sixth == 6:
+        # spawn_mask = spawn_mask & calm_area
+        output_sn[spawn_mask] = self.new_wind[self.sixth][0] + 10
+        output_ew[spawn_mask] = self.new_wind[self.sixth][1] - 10
+        if self.add_new_wind:
+            output_sn, output_ew = -output_sn, -output_ew
+        if self.sixth == 5:
             self.sixth = 0
-            self.option_one = not self.option_one
-        return output
+            self.add_new_wind = not self.add_new_wind
+        else:
+            self.sixth += 1
+        return output_sn, output_ew
 
-    def wind_interaction(self) -> NDArray:
-        # split wind matrix into south-north wind and east-west wind matrices
-        sn = np.where(self.mat[..., 0] != 0, self.mat[..., 0], 0)
-        ew = np.where(self.mat[..., 1] != 0, self.mat[..., 1], 0)
+    def obstacle_matrix(self, shift:int, axis:int) -> NDArray:
+        """
+        Return a matrix representing how much of an obstacle the terrain is in a given direction
+        :param shift:
+        :param axis:
+        :return: A matrix where each value represents how much wind erosion to apply to a wind source
+        """
+        return np.where(self.water.mat < np.roll(self.water.mat, shift, axis),
+                        np.roll(self.water.mat, shift, axis) - self.water.mat, 0)
 
-        # Terrain erodes wind if target cell is lower than origin cell
-        terrain = self.water.mat
-        south_diff = np.where(terrain < np.roll(terrain, 1, 0),
-                              np.roll(terrain, 1, 0) - terrain, 0)
-        north_diff = np.where(terrain < np.roll(terrain, -1, 0),
-                              np.roll(terrain, -1, 0) - terrain, 0)
-        east_diff = np.where(terrain < np.roll(terrain, 1, 1),
-                             np.roll(terrain, 1, 1) - terrain, 0)
-        west_diff = np.where(terrain < np.roll(terrain, -1, 1),
-                             np.roll(terrain, -1, 1) - terrain, 0)
 
-        # sum of own wind strength and neighborhood, for sn and ew
+    def wind_interaction(self) -> tuple[NDArray[np.int16], NDArray[np.int16]]:
+        # calculate terrain blocks
+        south_block = self.obstacle_matrix(1, 0)
+        north_block = self.obstacle_matrix(-1, 0)
+        east_block = self.obstacle_matrix(1, 1)
+        west_block = self.obstacle_matrix(-1, 1)
+        # sum of neighborhood wind strength, for sn and ew
         # applying erosion
-        sn_sum = (sn + np.roll(sn, 1, 0) - south_diff +
-                  np.roll(sn, -1, 0) - north_diff +
-                  np.roll(sn, 1, 1) - east_diff+
-                  np.roll(sn, -1, 1) - west_diff)
-        ew_sum = (ew + np.roll(ew, 1, 0) - south_diff +
-                  np.roll(ew, -1, 0) - north_diff +
-                  np.roll(ew, 1, 1) - east_diff +
-                  np.roll(ew, -1, 1) - west_diff)
-
-        # clip values according to SURFACE_STATES (inclusive)
-        sn_sum = np.clip(sn_sum, -WIND_STATES, WIND_STATES)
-        ew_sum = np.clip(ew_sum, -WIND_STATES, WIND_STATES)
-        # sn and ew cancel each other out
-        sn_fin = np.where(sn_sum > ew_sum, sn_sum, 0)
-        ew_fin = np.where(sn_sum < ew_sum, ew_sum, 0)
-        # combine them into a single matrix and return
-        output = np.stack([sn_fin, ew_fin], axis=-1)
-        return output
-
-    def kill_static_wind(self):
-        """Awful, disgusting little work around to keep wind from adopting a stable state instantly"""
-        static_north =  (self.move_n & np.roll(self.move_n, 1, 0) &
-                         np.roll(self.move_n, -1, 0) &
-                         np.roll(self.move_n, 1, 1) &
-                         np.roll(self.move_n, -1, 1))
-        static_south = (self.move_s & np.roll(self.move_s, 1, 0) &
-                        np.roll(self.move_s, -1, 0) &
-                        np.roll(self.move_s, 1, 1) &
-                        np.roll(self.move_s, -1, 1))
-        static_east = (self.move_e & np.roll(self.move_e, 1, 0) &
-                        np.roll(self.move_e, -1, 0) &
-                        np.roll(self.move_e, 1, 1) &
-                        np.roll(self.move_e, -1, 1))
-        static_west = (self.move_w & np.roll(self.move_w, 1, 0) &
-                        np.roll(self.move_w, -1, 0) &
-                        np.roll(self.move_w, 1, 1) &
-                        np.roll(self.move_w, -1, 1))
-        static = static_north | static_south | static_east | static_west
-        # only maximum wind speeds at either directino can be thought of as static
-        full_speed = (np.absolute(self.mat[...,0]) == WIND_STATES) | (np.absolute(self.mat[...,1]) == WIND_STATES)
-        static = static & full_speed
-        # nullify static winds
-        self.mat[static] = np.zeros_like(self.mat[static])
-
+        sn_sum = (np.roll(self.sn, 1, 0) - south_block +
+                  np.roll(self.sn, -1, 0) + north_block +
+                  np.roll(self.sn, 1, 1) - east_block +
+                  np.roll(self.sn, -1, 1) + west_block)
+        ew_sum = (np.roll(self.ew, 1, 0) - south_block +
+                  np.roll(self.ew, -1, 0) + north_block +
+                  np.roll(self.ew, 1, 1) - east_block +
+                  np.roll(self.ew, -1, 1) + west_block)
+        # # clip values to WIND_STATES
+        # sn_sum, ew_sum = np.clip(sn_sum, -WIND_STATES, WIND_STATES), np.clip(ew_sum, -WIND_STATES, WIND_STATES)
+        # get averages
+        sn_avg, ew_avg = sn_sum // 4, ew_sum // 4
+        # apply wind diffusion and return
+        output_sn = self.sn + np.rint(sn_avg).astype(np.int16)
+        output_ew = self.ew + np.rint(ew_avg).astype(np.int16)
+        # clip values to WIND_STATES
+        output_sn, output_ew = np.clip(output_sn, -WIND_STATES, WIND_STATES), np.clip(output_ew, -WIND_STATES, WIND_STATES)
+        return output_sn.astype(np.int16), output_ew.astype(np.int16)
 
     def update_wind(self) -> None:
         # calculate new values
-        self.mat = self.spawn_wind() + self.wind_interaction()
-        self.kill_static_wind()
+        spawned_sn, spawned_ew = self.spawn_wind()
+        inter_sn, inter_ew = self.wind_interaction()
+        self.sn, self.ew = spawned_sn + inter_sn, spawned_ew + inter_ew
         # update propagation direction matrices
-        self.move_s = np.where(self.mat[..., 0] > 0, True, False)
-        self.move_n = np.where(self.mat[..., 0] < 0, True, False)
-        self.move_e = np.where(self.mat[..., 1] > 0, True, False)
-        self.move_w = np.where(self.mat[..., 1] < 0, True, False)
+        self.move_s = np.where(self.sn > 0, True, False)
+        self.move_n = np.where(self.sn < 0, True, False)
+        self.move_e = np.where(self.ew > 0, True, False)
+        self.move_w = np.where(self.ew < 0, True, False)
 
-    def wind_propagation(self, mat:NDArray[np.uint8]) -> NDArray[np.uint8]:
+    def wind_propagation(self, mat: NDArray[np.uint8]) -> NDArray[np.uint8]:
         """propagate the given matrix (representing pollution or clouds, for example) according to the wind"""
         smat = mat.astype(np.int16)
         s_movers = np.where(self.move_s, -smat, 0)
@@ -260,14 +244,18 @@ class Wind:
         e_movers -= np.roll(e_movers, 1, 1)
         w_movers = np.where(self.move_w, -smat, 0)
         w_movers -= np.roll(w_movers, -1, 1)
-        output = mat + s_movers + n_movers + e_movers + w_movers
-        return output.astype(np.uint8)
-
+        # output = smat + s_movers + n_movers + e_movers + w_movers
+        # return output.astype(np.uint8)
+        if self.vert:
+            return (smat + s_movers + n_movers).astype(np.uint8)
+        return (smat + e_movers + w_movers).astype(np.uint8)
 
     def copy(self) -> Wind:
-        output = copy.copy(self) # shallow copy, only mat needs to be deep-copied, the rest are pointers
-                                 # to components that will handle their own update
-        output.mat = self.mat.copy()
+        output = copy.copy(self)  # shallow copy, only mat needs to be deep-copied, the rest are pointers
+        # to components that will handle their own update
+        output.sn = self.sn.copy()
+        output.ew = self.ew.copy()
+        output.vert = not self.vert
         return output
 
     def __iter__(self):
@@ -278,8 +266,9 @@ class Wind:
         output.update_wind()
         return output
 
-    def update_components(self, updated_water:Water) -> None:
+    def update_components(self, updated_water: Water) -> None:
         self.water = updated_water
+
 
 class Forest:
     """Representing forest tiles which clean pollution"""
