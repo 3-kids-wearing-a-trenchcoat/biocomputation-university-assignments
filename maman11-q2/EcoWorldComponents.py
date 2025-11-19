@@ -422,6 +422,12 @@ class Pollution:
         self.forest = forest
         self.wind = wind
 
-class Temperature:
-    """Representing temperature and the way it changes due to the sun, greenhouse effects and albedo"""
-    def __init__(self, ):
+# class Temperature:
+#     """Representing temperature and the way it changes due to the sun, greenhouse effects and albedo"""
+#     def __init__(self, water:Water, wind:Wind, pollution:Pollution):
+#         # TODO: add glaciers to Temperature
+#         self.water = water
+#         self.wind = wind
+#         self.pollution = pollution
+#         self.temp = np.zeros(water.mat.shape, dtype=np.int16)
+#

@@ -68,16 +68,12 @@ class EcoWorld:
         return self
 
     def __next__(self):
+        # advance components by one step
         comp_names = ["water", "wind", "forest", "industry", "pollution"]
         futures = {name: self.executor.submit(next, getattr(self, name))
                    for name in comp_names}
         for name, fut in futures.items():
             setattr(self, name, fut.result())
-        # advance components by one step
-        # self.water = next(self.water)
-        # self.wind = next(self.wind)
-        # self.forest = next(self.forest)
-        # self.industry = next(self.industry)
 
         # update points of components to components
         self.update_component_pointers()
