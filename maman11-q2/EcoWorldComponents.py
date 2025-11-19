@@ -9,12 +9,12 @@ DEFAULT_SIZE = 500
 INT8_MIN = -128
 INT8_MAX = 127
 UINT8_MAX = 255
-SURFACE_STATES = 8
+SURFACE_STATES = 120
 # component-specific constants
 DEFAULT_LAND_PORTION = 0.3 # portion of the surface that is made up of (initially) dry land
 DEFAULT_FOREST_COVERAGE = 0.4 # portion of dry land covered by forest
 DEFAULT_FOREST_GERMINATION = 50 # maximum number of cells from germination center for forest
-DEFAULT_INDUSTRY_GERM_LIMIT = 5
+DEFAULT_INDUSTRY_GERM_LIMIT = 3
 DEFAULT_INDUSTRY_QUANTITY = 700 # number of cells on dry land to be designated as industrial tiles
 DEFAULT_POLLUTION_RATE = 2 # how much pollution each industry tile spawns at each iteration
 DEFAULT_FOREST_CLEANING_RATE = 2 # how much pollution each forest tile removes at each iteration
@@ -128,13 +128,13 @@ class Wind:
         # initialize core variables
         self.water = water # water is used for the surface as elevation changes dictate wind erosion
                            # water can change elevation in this CA, surface remains static
-        self.sn = np.zeros((water.mat.shape[0], water.mat.shape[1]), dtype=np.int16) # south-north wind
+        self.sn = np.zeros((water.mat.shape[0], water.mat.shape[1]), dtype=np.int64) # south-north wind
         self.ew = np.zeros_like(self.sn) # east-west wind
         self.vert = True # whether the wind in this iteration is vertical (sn) or horizontal (ew)
         self.alpha = 0.5 # diffusion rate of wind
         # pseudo-random wind spawning variables kind-of sort-of modeled after real world wind movement
         self.sixth = 0
-        w = 200
+        w = 2
         self.new_wind = {0: (w, -w),
                          1: (-w, w),
                          2: (w, -w),
@@ -221,8 +221,8 @@ class Wind:
         # get averages
         sn_avg, ew_avg = sn_sum // 4, ew_sum // 4
         # apply wind diffusion and return
-        output_sn = self.sn + (self.alpha * np.rint(sn_avg).astype(np.int16))
-        output_ew = self.ew + (self.alpha * np.rint(ew_avg).astype(np.int16))
+        output_sn = self.sn + (self.alpha * np.rint(sn_avg).astype(np.int64))
+        output_ew = self.ew + (self.alpha * np.rint(ew_avg).astype(np.int64))
         # clip values to WIND_STATES
         # output_sn, output_ew = np.clip(output_sn, -WIND_STATES, WIND_STATES), np.clip(output_ew, -WIND_STATES, WIND_STATES)
         return output_sn.astype(np.int16), output_ew.astype(np.int16)
@@ -390,15 +390,28 @@ class Pollution:
         new_mat = np.clip(new_mat, 0, UINT8_MAX)
         self.mat = new_mat.astype(np.uint8)
 
+    def propagate_full_cells(self):
+        """have pollution spread to nearby cells if the cell is full"""
+        full = np.where(self.mat == UINT8_MAX, True, False).astype(np.bool)
+        change = np.zeros(self.mat.shape, dtype=np.int16)
+        change[full] = UINT8_MAX // 5
+        change += (np.roll(change, 1, 0) + np.roll(change, -1, 0) +
+                   np.roll(change, 1, 1) + np.roll(change, 1, -1))
+        change[full] = - (UINT8_MAX - change[full])
+        # self.mat += change
+        output = self.mat.astype(np.int16) + change
+        self.mat = output.astype(np.uint8)
+
     def __iter__(self):
         return self
 
     def __next__(self):
         output = copy.copy(self)
-        output.mat = copy.deepcopy(self.mat)
+        output.mat = self.mat.copy()
         output.clear_and_spawn()
         # output.wind_propagation()
-        output.mat = self.wind.wind_propagation(output.mat)
+        output.mat = self.wind.wind_propagation(output.mat.astype(np.uint8))
+        output.propagate_full_cells()
         return output
 
     def get_total_pollution(self) -> int:
@@ -408,3 +421,7 @@ class Pollution:
         self.industry = industry
         self.forest = forest
         self.wind = wind
+
+class Temperature:
+    """Representing temperature and the way it changes due to the sun, greenhouse effects and albedo"""
+    def __init__(self, ):
