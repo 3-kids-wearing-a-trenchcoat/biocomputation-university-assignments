@@ -15,7 +15,7 @@ BROWN = (101, 67, 33)
 GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 PURPLE = (128, 0, 128)
-# PURPLE = (191, 64, 191)
+WHITE = (255, 255, 255)
 OVERLAY_COLOR_ALPHA = 0.5
 
 class EcoWorld:
@@ -40,6 +40,7 @@ class EcoWorld:
         self.average_temperature = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
         self.average_temperature_ptr = 0
         # initialize toggles
+        self.show_surface = True
         self.show_pollution_toggle = True
         self.show_temperature_toggle = False
         self.show_clouds_toggle = False
@@ -131,15 +132,19 @@ class EcoWorld:
         Including water (blue), land (brown), trees (green), towns (gray) and ice (white)
         :return: 4D np.uint8 matrix representing RGBA values
         """
-        water_pos = self.water.get_water_position()
-        h, w = water_pos.shape
-        output = np.zeros((h, w, 3), dtype=np.uint8)
-        output[water_pos] = LIGHT_BLUE
-        output[~water_pos] = BROWN
-        if not self.show_temperature_toggle:
-            # blending the colors with green and red makes the temperature read difficult
-            output[self.forest.mat] = GREEN
-            output[self.industry.mat] = RED
+
+        h, w = self.surface.mat.shape
+        if self.show_surface:
+            water_pos = self.water.get_water_position()
+            output = np.zeros((h, w, 3), dtype=np.uint8)
+            output[water_pos] = LIGHT_BLUE
+            output[~water_pos] = BROWN
+            if not self.show_temperature_toggle:
+                # blending the colors with green and red makes the temperature read difficult
+                output[self.forest.mat] = GREEN
+                output[self.industry.mat] = RED
+        else:
+            output = np.full((h, w, 3), WHITE, dtype=np.uint8)
         if self.show_temperature_toggle:
             above_zero = np.where(self.temperature.temp > 0, self.temperature.temp, 0)
             below_zero = np.where(self.temperature.temp < 0, -self.temperature.temp, 0)
@@ -169,3 +174,6 @@ class EcoWorld:
 
     def clouds_toggle(self, checked: bool):
         self.show_clouds_toggle = checked
+
+    def surface_toggle(self, checked: bool):
+        self.show_surface = checked

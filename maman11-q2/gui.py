@@ -78,6 +78,11 @@ class MainWindow (QtWidgets.QMainWindow):
         self.pause_toggle = QtWidgets.QPushButton("Pause")
         self.pause_toggle.clicked.connect(self.pause_func)
         self.opt_layout.addWidget(self.pause_toggle)
+        # surface toggle
+        self.surface_toggle = QtWidgets.QCheckBox("show Surface")
+        self.surface_toggle.setChecked(self.world.show_surface)
+        self.surface_toggle.toggled.connect(self.world.surface_toggle)
+        self.opt_layout.addWidget(self.surface_toggle)
         # pollution toggle
         self.pollution_toggle = QtWidgets.QCheckBox("show pollution")
         self.pollution_toggle.setChecked(self.world.show_pollution_toggle)
