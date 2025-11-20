@@ -36,6 +36,8 @@ class EcoWorld:
         self.pollution_tracker_ptr = 0
         # initialize toggles
         self.show_pollution_toggle = True
+        self.show_temperature_toggle = False
+        self.show_clouds_toggle = False
         # initialize parallelism
         self.executor = ThreadPoolExecutor(max_workers=4)
         atexit.register(self.executor.shutdown, wait=True)
@@ -109,8 +111,6 @@ class EcoWorld:
 
         fg = np.stack([fg_a, fg_a, fg_a], axis=-1) * fg_c
         bg = np.stack([bg_a, bg_a, bg_a], axis=-1) * bg_c
-        # if np.any(fg != 0):
-        #     print("foreground")
         return (fg + bg) * UINT8_MAX
 
 
@@ -129,9 +129,6 @@ class EcoWorld:
         output[self.industry.mat] = RED
         if self.show_pollution_toggle:
             output = self.overlay_color(output, self.pollution.mat, PURPLE)
-        # where_pollution = self.pollution.mat > 0
-        # output[where_pollution] = (output[where_pollution] / (1 - OVERLAY_COLOR_ALPHA) +
-        #                            np.full_like(output[where_pollution], PURPLE) * OVERLAY_COLOR_ALPHA)
         return output
 
     def sea_level_history(self):
@@ -139,3 +136,13 @@ class EcoWorld:
 
     def pollution_history(self):
         return self.pollution_tracker[:self.pollution_tracker_ptr]
+
+    # toggle functions tied to GUI checkboxes and buttons
+    def pollution_toggle(self, checked: bool):
+        self.show_pollution_toggle = checked
+
+    def temperature_toggle(self, checked: bool):
+        self.show_temperature_toggle = checked
+
+    def clouds_toggle(self, checked: bool):
+        self.show_clouds_toggle = checked
