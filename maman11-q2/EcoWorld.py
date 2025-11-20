@@ -30,15 +30,15 @@ class EcoWorld:
         self.pollution = Pollution(self.industry, self.forest, self.wind)
         self.temperature = Temperature(self.water, self.wind, self.pollution, self.forest)
         # Data trackers
+        self.tracker_ptr = 0
         # average sea level
         self.sea_level = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
-        self.sea_level_ptr = 0
         # total pollution
         self.pollution_tracker = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float32)
-        self.pollution_tracker_ptr = 0
         # average temperature
         self.average_temperature = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
-        self.average_temperature_ptr = 0
+        # min/max
+
         # initialize toggles
         self.show_surface = True
         self.show_pollution_toggle = True
@@ -56,19 +56,16 @@ class EcoWorld:
 
     def update_trackers(self) -> None:
         # sea level
-        self.sea_level[self.sea_level_ptr] = self.water.average_sea_level()
-        self.sea_level_ptr += 1
-        if self.sea_level_ptr == self.sea_level.shape[0]:
-            self.sea_level = self.double_array_size(self.sea_level)
+        self.sea_level[self.tracker_ptr] = self.water.average_sea_level()
         # pollution
-        self.pollution_tracker[self.pollution_tracker_ptr] = self.pollution.get_total_pollution()
-        self.pollution_tracker_ptr += 1
-        if self.pollution_tracker_ptr == self.pollution_tracker.shape[0]:
-            self.pollution_tracker = self.double_array_size(self.pollution_tracker)
+        self.pollution_tracker[self.tracker_ptr] = self.pollution.get_total_pollution()
         # temperature
-        self.average_temperature[self.average_temperature_ptr] = self.temperature.get_average()
-        self.average_temperature_ptr += 1
-        if self.average_temperature_ptr == self.average_temperature.shape[0]:
+        self.average_temperature[self.tracker_ptr] = self.temperature.get_average()
+        # update tracker ptr and resize if needed
+        self.tracker_ptr += 1
+        if self.tracker_ptr == self.sea_level.shape[0]:
+            self.sea_level = self.double_array_size(self.sea_level)
+            self.pollution_tracker = self.double_array_size(self.pollution_tracker)
             self.average_temperature = self.double_array_size(self.average_temperature)
 
     def update_component_pointers(self):
@@ -148,7 +145,7 @@ class EcoWorld:
         if self.show_temperature_toggle:
             above_zero = np.where(self.temperature.temp > 0, self.temperature.temp, 0)
             below_zero = np.where(self.temperature.temp < 0, -self.temperature.temp, 0)
-            max_temp = np.max(np.absolute(self.temperature.temp))
+            max_temp = np.max(np.max(above_zero), np.max(below_zero))
             output = self.overlay_color(output, above_zero, RED, max_temp)
             output = self.overlay_color(output, below_zero, BLUE, max_temp)
         if self.show_pollution_toggle:
@@ -157,13 +154,13 @@ class EcoWorld:
 
     # value histories (for plotting)
     def sea_level_history(self):
-        return self.sea_level[:self.sea_level_ptr]
+        return self.sea_level[:self.tracker_ptr]
 
     def pollution_history(self):
-        return self.pollution_tracker[:self.pollution_tracker_ptr]
+        return self.pollution_tracker[:self.tracker_ptr]
 
     def temperature_history(self):
-        return self.average_temperature[:self.average_temperature_ptr]
+        return self.average_temperature[:self.tracker_ptr]
 
     # toggle functions tied to GUI checkboxes and buttons
     def pollution_toggle(self, checked: bool):

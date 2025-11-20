@@ -103,16 +103,6 @@ class MainWindow (QtWidgets.QMainWindow):
         self.opt_dock.setWidget(self.opt_widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.opt_dock)
 
-        # self.options_layout = pg.LayoutWidget()
-        # self.options_layout.setMaximumWidth(150)
-        # self.options_layout.addLabel("Options")
-        # self.options_layout.nextRow()
-        # self.show_pollution = QtWidgets.QCheckBox("show pollution")
-        # self.show_pollution.setChecked(self.world.show_pollution_toggle)
-        # self.show_pollution.toggled.connect(self.world.pollution_toggle)
-        # self.options_layout.addWidget(self.show_pollution)
-        # self.options_layout.show()
-
         # cross-hair, for inspecting each cell's value
         # TODO
         # timer (for plot update)

@@ -9,14 +9,14 @@ DEFAULT_SIZE = 500
 INT8_MIN = -128
 INT8_MAX = 127
 UINT8_MAX = 255
-SURFACE_STATES = 100
+SURFACE_STATES = 50
 # component-specific constants
 DEFAULT_LAND_PORTION = 0.3 # portion of the surface that is made up of (initially) dry land
 DEFAULT_FOREST_COVERAGE = 0.4 # portion of dry land covered by forest
 DEFAULT_FOREST_GERMINATION = 50 # maximum number of cells from germination center for forest
 DEFAULT_INDUSTRY_GERM_LIMIT = 3
 DEFAULT_INDUSTRY_QUANTITY = 700 # number of cells on dry land to be designated as industrial tiles
-DEFAULT_POLLUTION_RATE = 4 # how much pollution each industry tile spawns at each iteration
+DEFAULT_POLLUTION_RATE = 10 # how much pollution each industry tile spawns at each iteration
 DEFAULT_FOREST_CLEANING_RATE = 2 # how much pollution each forest tile removes at each iteration
 START_POLLUTION = 0 # how much pollution should each cell start out with, mostly for debugging
 WIND_STATES = 200 # maximum wind speed in any direction
@@ -131,10 +131,10 @@ class Wind:
         self.sn = np.zeros((water.mat.shape[0], water.mat.shape[1]), dtype=np.int64) # south-north wind
         self.ew = np.zeros_like(self.sn) # east-west wind
         self.vert = True # whether the wind in this iteration is vertical (sn) or horizontal (ew)
-        self.alpha = 0.5 # diffusion rate of wind
+        self.alpha = 0.2 # diffusion rate of wind
         # pseudo-random wind spawning variables kind-of sort-of modeled after real world wind movement
         self.sixth = 0
-        w = 2
+        w = 10
         self.new_wind = {0: (w, -w),
                          1: (-w, w),
                          2: (w, -w),
@@ -161,14 +161,14 @@ class Wind:
         spawn_start = self.sixth_length * self.sixth
         spawn_end = spawn_start + self.sixth_length
         spawn_mask[spawn_start : spawn_end] = True
-        spawn_mask = spawn_mask & calm_area
+        spawn_mask = spawn_mask & calm
         output_sn[...,spawn_mask] = self.new_wind[self.sixth][0]
         output_ew[...,spawn_mask] = self.new_wind[self.sixth][1]
         if self.add_new_wind:
             output_sn, output_ew = -output_sn, -output_ew
         if self.sixth == 5:
             self.sixth = 0
-            self.add_new_wind = not self.add_new_wind
+            # self.add_new_wind = not self.add_new_wind
         else:
             self.sixth += 1
         return output_sn, output_ew
@@ -419,12 +419,12 @@ class Temperature:
 
         # constants
         h = self.water.mat.shape[1]
-        init_temp_equator = 30 # initial temperature at the center of the map
-        init_temp_between = 15
-        init_temp_pole = -10 # initial temperature at both poles
-        pole_relative_span = 0.05 # fraction of map occupied by either pole (total pole span is double that, two poles innit)
+        init_temp_equator = 0 # initial temperature at the center of the map
+        init_temp_between = 10
+        init_temp_pole = -100 # initial temperature at both poles
+        pole_relative_span = 0.1 # fraction of map occupied by either pole (total pole span is double that, two poles innit)
         n_pole_range, s_pole_range = (0, int(h * pole_relative_span)), (int((1 - pole_relative_span) * h), h)
-        equator_relative_span = 0.3 # fraction of map occupied by the "equator" (center bit)
+        equator_relative_span = 0.1 # fraction of map occupied by the "equator" (center bit)
         equator_radius = h * (equator_relative_span // 2)
         equator_range = (int((h // 2) - equator_radius), int((h // 2) + equator_radius))
         equator_in = 8 # incoming temperature at the equator cell (from the sun)
@@ -432,7 +432,7 @@ class Temperature:
         between_in = (equator_in + pole_in) // 2 # incoming temperature at area between the equator and a pole
         self.albedo = {# how much incoming heat is reflected back into space, approximated by a flat reduction of incoming
                        'g': 1, # bare ground
-                       'f': 1, # forest
+                       'f': 0, # forest
                        'w': 0, # water
                        'i': 3, # ice
                        'c': 2, # non-rain cloud
@@ -457,7 +457,7 @@ class Temperature:
                         'r': 0,  # rain cloud
                         'p': 1  # pollution
                         }
-        self.alpha = 0.1 # rate of ambient propagation
+        self.alpha = 0.5 # rate of ambient propagation
 
         # initialize matrices
         # temp - actual temperature of each cell
@@ -497,14 +497,10 @@ class Temperature:
         self.forest = forest
 
     def get_albedo_matrix(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
-        # output = np.zeros_like(self.temp)
-        # output += [masks.get(c) * self.albedo.get(c) for c in masks.keys()]
         output = np.sum([masks.get(c) * self.albedo.get(c) for c in masks.keys()], axis=0)
         return output
 
     def get_greenhouse_matrix(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
-        # output = np.zeros_like(self.temp)
-        # output += [masks.get(c) * self.greenhouse.get(c) for c in masks.keys()]
         output = np.sum([masks.get(c) * self.greenhouse.get(c) for c in masks.keys()], axis=0)
         return output
 
@@ -516,8 +512,6 @@ class Temperature:
         return output
 
     def get_radiation(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
-        # output = np.zeros_like(self.temp)
-        # output += [masks.get(c) * self.rad.get(c) for c in masks.keys()]
         output = np.sum([masks.get(c) * self.rad.get(c) for c in masks.keys()], axis=0)
         return output
 
