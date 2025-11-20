@@ -104,7 +104,7 @@ class Water:
     def get_water_position(self) -> np.typing.NDArray[np.bool]:
         return np.where(self.mat - self.surface.mat > 0, True, False).astype(np.bool)
 
-    def average_sea_level(self) -> float:
+    def average_sea_level(self) -> np.float16:
         water_pos = self.get_water_position()
         return self.mat[water_pos].mean()
 
@@ -162,8 +162,8 @@ class Wind:
         spawn_end = spawn_start + self.sixth_length
         spawn_mask[spawn_start : spawn_end] = True
         spawn_mask = spawn_mask & calm_area
-        output_sn[spawn_mask] = self.new_wind[self.sixth][0]
-        output_ew[spawn_mask] = self.new_wind[self.sixth][1]
+        output_sn[...,spawn_mask] = self.new_wind[self.sixth][0]
+        output_ew[...,spawn_mask] = self.new_wind[self.sixth][1]
         if self.add_new_wind:
             output_sn, output_ew = -output_sn, -output_ew
         if self.sixth == 5:
@@ -200,21 +200,6 @@ class Wind:
         return sn_sum, ew_sum
 
     def wind_interaction(self) -> tuple[NDArray[np.int16], NDArray[np.int16]]:
-        # calculate terrain blocks
-        # south_block = self.obstacle_matrix(1, 0)
-        # north_block = self.obstacle_matrix(-1, 0)
-        # east_block = self.obstacle_matrix(1, 1)
-        # west_block = self.obstacle_matrix(-1, 1)
-        # sum of neighborhood wind strength, for sn and ew
-        # applying erosion
-        # sn_sum = (np.roll(self.sn, 1, 0) - south_block +
-        #           np.roll(self.sn, -1, 0) + north_block +
-        #           np.roll(self.sn, 1, 1) - east_block +
-        #           np.roll(self.sn, -1, 1) + west_block)
-        # ew_sum = (np.roll(self.ew, 1, 0) - south_block +
-        #           np.roll(self.ew, -1, 0) + north_block +
-        #           np.roll(self.ew, 1, 1) - east_block +
-        #           np.roll(self.ew, -1, 1) + west_block)
         sn_sum, ew_sum = self.sum_with_wind_erosion()
         # # clip values to WIND_STATES
         # sn_sum, ew_sum = np.clip(sn_sum, -WIND_STATES, WIND_STATES), np.clip(ew_sum, -WIND_STATES, WIND_STATES)
@@ -414,7 +399,7 @@ class Pollution:
         output.propagate_full_cells()
         return output
 
-    def get_total_pollution(self) -> int:
+    def get_total_pollution(self) -> np.float32:
         return np.sum(self.mat)
 
     def update_components(self, industry:Industry, forest:Forest, wind:Wind) -> None:
@@ -422,12 +407,69 @@ class Pollution:
         self.forest = forest
         self.wind = wind
 
-# class Temperature:
-#     """Representing temperature and the way it changes due to the sun, greenhouse effects and albedo"""
-#     def __init__(self, water:Water, wind:Wind, pollution:Pollution):
-#         # TODO: add glaciers to Temperature
-#         self.water = water
-#         self.wind = wind
-#         self.pollution = pollution
-#         self.temp = np.zeros(water.mat.shape, dtype=np.int16)
-#
+class Temperature:
+    """Representing temperature and the way it changes due to the sun, greenhouse effects and albedo"""
+    def __init__(self, water:Water, wind:Wind, pollution:Pollution):
+        # TODO: add glaciers & clouds to Temperature
+        # set related components
+        self.water = water
+        self.wind = wind
+        self.pollution = pollution
+
+        # constants
+        h = self.water.mat.shape[1]
+        init_temp_equator = 25 # initial temperature at the center of the map
+        init_temp_between = 18
+        init_temp_pole = -30 # initial temperature at both poles
+        pole_relative_span = 0.1 # fraction of map occupied by either pole (total pole span is double that, two poles innit)
+        n_pole_range, s_pole_range = (0, int(h * pole_relative_span)), (int((1 - pole_relative_span) * h), h)
+        equator_relative_span = 0.2 # fraction of map occupied by the "equator" (center bit)
+        equator_radius = h * (equator_relative_span // 2)
+        equator_range = (int((h // 2) - equator_radius), int((h // 2) + equator_radius))
+        equator_in = 4 # incoming temperature at the equator cell (from the sun)
+        pole_in = 2 # incoming temperature at the poles (from the sun)
+        between_in = (equator_in + pole_in) // 2 # incoming temperature at area between the equator and a pole
+        self.albedo = {# how much incoming heat is reflected back into space, approximated by a flat reduction of incoming
+                       'g': 1, # bare ground
+                       'f': 1, # forest
+                       'w': 0, # water
+                       'i': 3, # ice
+                       'c': 2, # non-rain cloud
+                       'r': 4, # rain cloud
+                       'p': 0  # pollution
+                       }
+        self.rad = { # how much heat is radiated back into space
+                        'g': 1,  # bare ground
+                        'f': 1,  # forest
+                        'w': 1,  # water
+                        'i': 1,  # ice
+                        'c': 1,  # non-rain cloud
+                        'r': 1,  # rain cloud
+                        'p': 0   # pollution
+                        }
+        self.greenhouse = { # how much outgoing radiation is reflected back into earth, approximated by a flat reduction
+                        'g': 0,  # bare ground
+                        'f': 0,  # forest
+                        'w': 0,  # water
+                        'i': 0,  # ice
+                        'c': 0,  # non-rain cloud
+                        'r': 0,  # rain cloud
+                        'p': 1  # pollution
+                        }
+
+        # initialize matrices
+        # temp - actual temperature of each cell
+        self.temp = np.full(water.mat.shape, init_temp_between, dtype=np.int8)
+        self.temp[..., n_pole_range[0] : n_pole_range[1]] = init_temp_pole
+        self.temp[..., s_pole_range[0] : s_pole_range[1]] = init_temp_pole
+        self.temp[..., equator_range[0] : equator_range[1]] = init_temp_equator
+        # sun - incoming heat
+        self.sun = np.full_like(self.temp, between_in)
+        self.sun[n_pole_range[0] : n_pole_range[1]] = pole_in
+        self.sun[s_pole_range[0] : s_pole_range[1]] = pole_in
+        self.sun[equator_range[0] : equator_range[1]] = equator_in
+        # albedo and greenhouse aren't getting their own matrix as they depend on the changing world state
+        # and will be recalculated at each iteration.
+
+    def get_average(self) -> np.float16:
+        return np.average(self.temp)

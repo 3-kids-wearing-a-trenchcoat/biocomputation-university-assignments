@@ -15,6 +15,7 @@ class MainWindow (QtWidgets.QMainWindow):
         # set sea level plot
         self.sea_level_plot.plot(self.world.sea_level_history(), clear=True, _callSync='off')
         self.pollution_plot.plot(self.world.pollution_history(), clear=True, _callSync='off')
+        self.temp_plot.plot(self.world.temperature_history(), clear=True, _callSync='off')
 
     def pause_func(self):
         self.paused = not self.paused
@@ -61,6 +62,12 @@ class MainWindow (QtWidgets.QMainWindow):
         self.pollution_plot.setClipToView(True)
         self.pollution_plot.setDownsampling(mode='peak')
         self.pollution_curve = self.pollution_plot.plot(self.world.pollution_history())
+        # average temperature
+        self.tracker_layout.nextRow()
+        self.temp_plot = self.tracker_layout.addPlot(title="Average Temperature")
+        self.temp_plot.setClipToView(True)
+        self.temp_plot.setDownsampling(mode='peak')
+        self.temp_curve = self.temp_plot.plot(self.world.temperature_history())
 
         # options
         self.opt_dock = QtWidgets.QDockWidget("Options", self)

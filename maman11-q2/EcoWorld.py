@@ -9,6 +9,7 @@ import atexit
 INITIAL_HISTORY_SIZE = 100
 # colors
 LIGHT_BLUE = (0, 150, 255)
+BLUE = (0, 0, 255)
 BLACK = (0, 0, 0)
 BROWN = (101, 67, 33)
 GREEN = (0, 255, 0)
@@ -27,13 +28,17 @@ class EcoWorld:
         self.forest = Forest(rnd_gen, self.surface, self.water)
         self.industry = Industry(rnd_gen, self.surface, self.water, self.forest)
         self.pollution = Pollution(self.industry, self.forest, self.wind)
+        self.temperature = Temperature(self.water, self.wind, self.pollution)
         # Data trackers
         # average sea level
-        self.sea_level = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.uint8)
+        self.sea_level = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
         self.sea_level_ptr = 0
         # total pollution
-        self.pollution_tracker = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.uint64)
+        self.pollution_tracker = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float32)
         self.pollution_tracker_ptr = 0
+        # average temperature
+        self.average_temperature = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
+        self.average_temperature_ptr = 0
         # initialize toggles
         self.show_pollution_toggle = True
         self.show_temperature_toggle = False
@@ -59,6 +64,11 @@ class EcoWorld:
         self.pollution_tracker_ptr += 1
         if self.pollution_tracker_ptr == self.pollution_tracker.shape[0]:
             self.pollution_tracker = self.double_array_size(self.pollution_tracker)
+        # temperature
+        self.average_temperature[self.average_temperature_ptr] = self.temperature.get_average()
+        self.average_temperature_ptr += 1
+        if self.average_temperature_ptr == self.average_temperature.shape[0]:
+            self.average_temperature = self.double_array_size(self.average_temperature)
 
     def update_component_pointers(self):
         self.wind.update_components(self.water)
@@ -129,13 +139,22 @@ class EcoWorld:
         output[self.industry.mat] = RED
         if self.show_pollution_toggle:
             output = self.overlay_color(output, self.pollution.mat, PURPLE)
+        if self.show_temperature_toggle:
+            above_zero = np.where(self.temperature.temp > 0, self.temperature.temp, 0)
+            below_zero = np.where(self.temperature.temp < 0, -self.temperature.temp, 0)
+            output = self.overlay_color(output, above_zero, RED)
+            output = self.overlay_color(output, below_zero, BLUE)
         return output
 
+    # value histories (for plotting)
     def sea_level_history(self):
         return self.sea_level[:self.sea_level_ptr]
 
     def pollution_history(self):
         return self.pollution_tracker[:self.pollution_tracker_ptr]
+
+    def temperature_history(self):
+        return self.average_temperature[:self.average_temperature_ptr]
 
     # toggle functions tied to GUI checkboxes and buttons
     def pollution_toggle(self, checked: bool):
