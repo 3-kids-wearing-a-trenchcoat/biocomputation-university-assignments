@@ -28,7 +28,7 @@ class EcoWorld:
         self.forest = Forest(rnd_gen, self.surface, self.water)
         self.industry = Industry(rnd_gen, self.surface, self.water, self.forest)
         self.pollution = Pollution(self.industry, self.forest, self.wind)
-        self.temperature = Temperature(self.water, self.wind, self.pollution)
+        self.temperature = Temperature(self.water, self.wind, self.pollution, self.forest)
         # Data trackers
         # average sea level
         self.sea_level = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
@@ -75,13 +75,14 @@ class EcoWorld:
         self.forest.update_components(self.water)
         self.industry.update_components(self.water)
         self.pollution.update_components(self.industry, self.forest, self.wind)
+        self.temperature.update_components(self.water, self.wind, self.pollution, self.forest)
 
     def __iter__(self):
         return self
 
     def __next__(self):
         # advance components by one step
-        comp_names = ["water", "wind", "forest", "industry", "pollution"]
+        comp_names = ["water", "wind", "forest", "industry", "pollution", "temperature"]
         futures = {name: self.executor.submit(next, getattr(self, name))
                    for name in comp_names}
         for name, fut in futures.items():
@@ -108,20 +109,20 @@ class EcoWorld:
 
     @staticmethod
     def overlay_color(origin:NDArray[np.uint8], mask:NDArray, color:tuple[int, int, int],
-                      proportional:bool=True) -> NDArray:
+                      max_point=UINT8_MAX, proportional:bool=True) -> NDArray:
         if not proportional:
             return np.where(mask,
                             ((1 - OVERLAY_COLOR_ALPHA)*origin) + OVERLAY_COLOR_ALPHA * np.full_like(origin, color),
                             origin)
-        fg_a = mask.astype(np.float64) / UINT8_MAX
+        fg_a = mask.astype(np.float64) / max_point
         bg_a = 1 - fg_a
         fg_a_expanded = np.full_like(origin, np.array(color).astype(np.float64))
-        fg_c = fg_a_expanded / UINT8_MAX
-        bg_c = origin.astype(np.float64) / UINT8_MAX
+        fg_c = fg_a_expanded / max_point
+        bg_c = origin.astype(np.float64) / max_point
 
         fg = np.stack([fg_a, fg_a, fg_a], axis=-1) * fg_c
         bg = np.stack([bg_a, bg_a, bg_a], axis=-1) * bg_c
-        return (fg + bg) * UINT8_MAX
+        return (fg + bg) * max_point
 
 
     def get_map(self) -> NDArray[np.uint8]:
@@ -135,15 +136,18 @@ class EcoWorld:
         output = np.zeros((h, w, 3), dtype=np.uint8)
         output[water_pos] = LIGHT_BLUE
         output[~water_pos] = BROWN
-        output[self.forest.mat] = GREEN
-        output[self.industry.mat] = RED
-        if self.show_pollution_toggle:
-            output = self.overlay_color(output, self.pollution.mat, PURPLE)
+        if not self.show_temperature_toggle:
+            # blending the colors with green and red makes the temperature read difficult
+            output[self.forest.mat] = GREEN
+            output[self.industry.mat] = RED
         if self.show_temperature_toggle:
             above_zero = np.where(self.temperature.temp > 0, self.temperature.temp, 0)
             below_zero = np.where(self.temperature.temp < 0, -self.temperature.temp, 0)
-            output = self.overlay_color(output, above_zero, RED)
-            output = self.overlay_color(output, below_zero, BLUE)
+            max_temp = np.max(np.absolute(self.temperature.temp))
+            output = self.overlay_color(output, above_zero, RED, max_temp)
+            output = self.overlay_color(output, below_zero, BLUE, max_temp)
+        if self.show_pollution_toggle:
+            output = self.overlay_color(output, self.pollution.mat, PURPLE)
         return output
 
     # value histories (for plotting)

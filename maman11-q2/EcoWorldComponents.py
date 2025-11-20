@@ -9,14 +9,14 @@ DEFAULT_SIZE = 500
 INT8_MIN = -128
 INT8_MAX = 127
 UINT8_MAX = 255
-SURFACE_STATES = 120
+SURFACE_STATES = 100
 # component-specific constants
 DEFAULT_LAND_PORTION = 0.3 # portion of the surface that is made up of (initially) dry land
 DEFAULT_FOREST_COVERAGE = 0.4 # portion of dry land covered by forest
 DEFAULT_FOREST_GERMINATION = 50 # maximum number of cells from germination center for forest
 DEFAULT_INDUSTRY_GERM_LIMIT = 3
 DEFAULT_INDUSTRY_QUANTITY = 700 # number of cells on dry land to be designated as industrial tiles
-DEFAULT_POLLUTION_RATE = 2 # how much pollution each industry tile spawns at each iteration
+DEFAULT_POLLUTION_RATE = 4 # how much pollution each industry tile spawns at each iteration
 DEFAULT_FOREST_CLEANING_RATE = 2 # how much pollution each forest tile removes at each iteration
 START_POLLUTION = 0 # how much pollution should each cell start out with, mostly for debugging
 WIND_STATES = 200 # maximum wind speed in any direction
@@ -223,7 +223,7 @@ class Wind:
         self.move_e = np.where(self.ew > 0, True, False)
         self.move_w = np.where(self.ew < 0, True, False)
 
-    def wind_propagation(self, mat: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    def wind_propagation(self, mat: NDArray[np.uint8 | np.int8], output_type = np.uint8) -> NDArray:
         """propagate the given matrix (representing pollution or clouds, for example) according to the wind"""
         smat = mat.astype(np.int16)
         s_movers = np.where(self.move_s, -smat, 0)
@@ -237,8 +237,8 @@ class Wind:
         # output = smat + s_movers + n_movers + e_movers + w_movers
         # return output.astype(np.uint8)
         if self.vert:
-            return (smat + s_movers + n_movers).astype(np.uint8)
-        return (smat + e_movers + w_movers).astype(np.uint8)
+            return (smat + s_movers + n_movers).astype(output_type)
+        return (smat + e_movers + w_movers).astype(output_type)
 
     def copy(self) -> Wind:
         output = copy.copy(self)  # shallow copy, only mat needs to be deep-copied, the rest are pointers
@@ -409,25 +409,26 @@ class Pollution:
 
 class Temperature:
     """Representing temperature and the way it changes due to the sun, greenhouse effects and albedo"""
-    def __init__(self, water:Water, wind:Wind, pollution:Pollution):
+    def __init__(self, water:Water, wind:Wind, pollution:Pollution, forest:Forest):
         # TODO: add glaciers & clouds to Temperature
         # set related components
         self.water = water
         self.wind = wind
         self.pollution = pollution
+        self.forest = forest
 
         # constants
         h = self.water.mat.shape[1]
-        init_temp_equator = 25 # initial temperature at the center of the map
-        init_temp_between = 18
-        init_temp_pole = -30 # initial temperature at both poles
-        pole_relative_span = 0.1 # fraction of map occupied by either pole (total pole span is double that, two poles innit)
+        init_temp_equator = 30 # initial temperature at the center of the map
+        init_temp_between = 15
+        init_temp_pole = -10 # initial temperature at both poles
+        pole_relative_span = 0.05 # fraction of map occupied by either pole (total pole span is double that, two poles innit)
         n_pole_range, s_pole_range = (0, int(h * pole_relative_span)), (int((1 - pole_relative_span) * h), h)
-        equator_relative_span = 0.2 # fraction of map occupied by the "equator" (center bit)
+        equator_relative_span = 0.3 # fraction of map occupied by the "equator" (center bit)
         equator_radius = h * (equator_relative_span // 2)
         equator_range = (int((h // 2) - equator_radius), int((h // 2) + equator_radius))
-        equator_in = 4 # incoming temperature at the equator cell (from the sun)
-        pole_in = 2 # incoming temperature at the poles (from the sun)
+        equator_in = 8 # incoming temperature at the equator cell (from the sun)
+        pole_in = 3 # incoming temperature at the poles (from the sun)
         between_in = (equator_in + pole_in) // 2 # incoming temperature at area between the equator and a pole
         self.albedo = {# how much incoming heat is reflected back into space, approximated by a flat reduction of incoming
                        'g': 1, # bare ground
@@ -440,7 +441,7 @@ class Temperature:
                        }
         self.rad = { # how much heat is radiated back into space
                         'g': 1,  # bare ground
-                        'f': 1,  # forest
+                        'f': 0,  # forest
                         'w': 1,  # water
                         'i': 1,  # ice
                         'c': 1,  # non-rain cloud
@@ -456,6 +457,7 @@ class Temperature:
                         'r': 0,  # rain cloud
                         'p': 1  # pollution
                         }
+        self.alpha = 0.1 # rate of ambient propagation
 
         # initialize matrices
         # temp - actual temperature of each cell
@@ -465,11 +467,89 @@ class Temperature:
         self.temp[..., equator_range[0] : equator_range[1]] = init_temp_equator
         # sun - incoming heat
         self.sun = np.full_like(self.temp, between_in)
-        self.sun[n_pole_range[0] : n_pole_range[1]] = pole_in
-        self.sun[s_pole_range[0] : s_pole_range[1]] = pole_in
-        self.sun[equator_range[0] : equator_range[1]] = equator_in
-        # albedo and greenhouse aren't getting their own matrix as they depend on the changing world state
+        self.sun[..., n_pole_range[0] : n_pole_range[1]] = pole_in
+        self.sun[..., s_pole_range[0] : s_pole_range[1]] = pole_in
+        self.sun[..., equator_range[0] : equator_range[1]] = equator_in
+        # albedo, rad and greenhouse aren't getting their own matrix as they depend on the changing world state
         # and will be recalculated at each iteration.
 
     def get_average(self) -> np.float16:
         return np.average(self.temp)
+
+    def ambient_diffusion(self):
+        neighbor_sum = (np.roll(self.temp, 1, 0) + np.roll(self.temp, -1, 0) +
+                        np.roll(self.temp, 1, 1) + np.roll(self.temp, -1, 1))
+        change = np.rint((neighbor_sum // 4) * self.alpha)
+        self.temp = change.astype(np.int8)
+
+    def wind_propagation(self):
+        self.temp = self.wind.wind_propagation(self.temp, np.int8)
+
+    def propagate(self):
+        self.ambient_diffusion()
+        self.wind_propagation()
+
+    def update_components(self, water:Water, wind:Wind, pollution:Pollution, forest:Forest):
+        # TODO: add ice and clouds
+        self.wind = wind
+        self.water = water
+        self.pollution = pollution
+        self.forest = forest
+
+    def get_albedo_matrix(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
+        # output = np.zeros_like(self.temp)
+        # output += [masks.get(c) * self.albedo.get(c) for c in masks.keys()]
+        output = np.sum([masks.get(c) * self.albedo.get(c) for c in masks.keys()], axis=0)
+        return output
+
+    def get_greenhouse_matrix(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
+        # output = np.zeros_like(self.temp)
+        # output += [masks.get(c) * self.greenhouse.get(c) for c in masks.keys()]
+        output = np.sum([masks.get(c) * self.greenhouse.get(c) for c in masks.keys()], axis=0)
+        return output
+
+    def get_incoming_heat(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
+        # calculate incoming heat after taking albedo into account
+        output = self.sun - self.get_albedo_matrix(masks)
+        # negative values mean more radiation is being blocked than passes, so they should change to 0
+        output = np.where(output < 0, 0, output)
+        return output
+
+    def get_radiation(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
+        # output = np.zeros_like(self.temp)
+        # output += [masks.get(c) * self.rad.get(c) for c in masks.keys()]
+        output = np.sum([masks.get(c) * self.rad.get(c) for c in masks.keys()], axis=0)
+        return output
+
+    def get_outgoing_heat(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
+        # calculate outgoing heat after taking greenhouse into account
+        output = self.get_radiation(masks) - self.get_greenhouse_matrix(masks)
+        # negative values means more radiation is being blocked than passes, so they should change to 0
+        output = np.where(output < 0, 0, output)
+        return output
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        # create new Temperature object
+        output = copy.copy(self)
+        output.temp = self.temp.copy()
+
+        output.propagate()
+        # TODO: add ice and clouds
+        masks = {'f': self.forest.mat,  # forest
+                 'w': self.water.get_water_position(),  # water
+                 # 'i': 0,  # ice
+                 'g': np.logical_not(self.forest.mat & self.water.get_water_position()),  # bare ground
+                 # 'c': 0,  # non-rain cloud
+                 # 'r': 0,  # rain cloud
+                 'p': np.where(self.pollution.mat > 0, True, False).astype(np.bool)  # pollution
+                }
+        change = self.get_incoming_heat(masks) - self.get_outgoing_heat(masks)
+        tmp = output.temp.astype(np.int16)
+        tmp += change
+        tmp = np.where(tmp > INT8_MAX, INT8_MAX,
+                       np.where(tmp < INT8_MIN, INT8_MIN, tmp))
+        output.temp = tmp.astype(np.int8)
+        return output
