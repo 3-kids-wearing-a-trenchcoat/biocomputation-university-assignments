@@ -29,12 +29,15 @@ class EcoWorld:
         self.industry = Industry(rnd_gen, self.surface, self.water, self.forest)
         self.pollution = Pollution(self.industry, self.forest, self.wind)
         self.temperature = Temperature(self.water, self.wind, self.pollution, self.forest)
+        self.ice = Ice(self.water)
+        self.ice.temperature = self.temperature # add explicitly as this couldn't be in Ice's init
+        self.water.ice = self.ice
         # Data trackers
         self.tracker_ptr = 0
         # average sea level
         self.sea_level = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
         # total pollution
-        self.pollution_tracker = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float32)
+        self.pollution_tracker = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.uint32)
         # average temperature
         self.average_temperature = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
         # min/max
@@ -45,12 +48,12 @@ class EcoWorld:
         self.show_temperature_toggle = False
         self.show_clouds_toggle = False
         # initialize parallelism
-        self.executor = ThreadPoolExecutor(max_workers=4)
+        self.executor = ThreadPoolExecutor(max_workers=8)
         atexit.register(self.executor.shutdown, wait=True)
 
     @staticmethod
-    def double_array_size(a:np.typing.NDArray) -> np.typing.NDArray:
-        output = np.empty(a.shape[0] * 2)
+    def double_array_size(a: NDArray) -> np.typing.NDArray:
+        output = np.empty(a.shape[0] * 2, dtype=a.dtype)
         output[:a.shape[0]] = a
         return output
 
@@ -120,7 +123,7 @@ class EcoWorld:
 
         fg = np.stack([fg_a, fg_a, fg_a], axis=-1) * fg_c
         bg = np.stack([bg_a, bg_a, bg_a], axis=-1) * bg_c
-        return (fg + bg) * max_point
+        return ((fg + bg) * max_point).astype(np.uint8)
 
 
     def get_map(self) -> NDArray[np.uint8]:
@@ -136,16 +139,17 @@ class EcoWorld:
             output = np.zeros((h, w, 3), dtype=np.uint8)
             output[water_pos] = LIGHT_BLUE
             output[~water_pos] = BROWN
+            output[self.ice.mat > 0] = WHITE
             if not self.show_temperature_toggle:
                 # blending the colors with green and red makes the temperature read difficult
                 output[self.forest.mat] = GREEN
                 output[self.industry.mat] = RED
         else:
-            output = np.full((h, w, 3), WHITE, dtype=np.uint8)
+            output = np.full((h, w, 3), BLACK, dtype=np.uint8)
         if self.show_temperature_toggle:
             above_zero = np.where(self.temperature.temp > 0, self.temperature.temp, 0)
             below_zero = np.where(self.temperature.temp < 0, -self.temperature.temp, 0)
-            max_temp = np.max(np.max(above_zero), np.max(below_zero))
+            max_temp = INT8_MAX // 4
             output = self.overlay_color(output, above_zero, RED, max_temp)
             output = self.overlay_color(output, below_zero, BLUE, max_temp)
         if self.show_pollution_toggle:

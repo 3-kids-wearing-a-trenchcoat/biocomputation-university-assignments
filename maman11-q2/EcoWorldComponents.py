@@ -5,19 +5,19 @@ from tqdm import tqdm
 import copy
 
 # constants
-DEFAULT_SIZE = 500
+DEFAULT_SIZE = 300
 INT8_MIN = -128
 INT8_MAX = 127
 UINT8_MAX = 255
-SURFACE_STATES = 50
+SURFACE_STATES = 5
 # component-specific constants
 DEFAULT_LAND_PORTION = 0.3 # portion of the surface that is made up of (initially) dry land
-DEFAULT_FOREST_COVERAGE = 0.4 # portion of dry land covered by forest
-DEFAULT_FOREST_GERMINATION = 50 # maximum number of cells from germination center for forest
+DEFAULT_FOREST_COVERAGE = 0.3 # portion of dry land covered by forest
+DEFAULT_FOREST_GERMINATION = 20 # maximum number of cells from germination center for forest
 DEFAULT_INDUSTRY_GERM_LIMIT = 3
 DEFAULT_INDUSTRY_QUANTITY = 700 # number of cells on dry land to be designated as industrial tiles
-DEFAULT_POLLUTION_RATE = 10 # how much pollution each industry tile spawns at each iteration
-DEFAULT_FOREST_CLEANING_RATE = 2 # how much pollution each forest tile removes at each iteration
+DEFAULT_POLLUTION_RATE = 500 # how much pollution each industry tile spawns at each iteration
+DEFAULT_FOREST_CLEANING_RATE = 1 # how much pollution each forest tile removes at each iteration
 START_POLLUTION = 0 # how much pollution should each cell start out with, mostly for debugging
 WIND_STATES = 200 # maximum wind speed in any direction
 
@@ -67,7 +67,7 @@ class Water:
     def __init__(self, surface:Surface, initial_water_level:int=1):
         self.surface = surface
         self.mat = np.where(surface.mat < initial_water_level, initial_water_level, surface.mat)
-
+        self.ice = None # set later, can't be set now as Water and Ice are co-dependent
 
     def directional_equalize(self, shift:int, axis:int) -> None:
         """apply flow in the direction of shift on the given axis (shift and axis as used in np.roll)"""
@@ -86,6 +86,9 @@ class Water:
         Water moves from one cell to another if the other cell's height (including water) is lower than this one's"""
         [self.directional_equalize(i, j) for i, j in ((1,0), (-1,0), (1,1), (-1,1))]
 
+    def ice_changes(self):
+        return
+
     def __iter__(self) -> Water:
         return self
 
@@ -93,6 +96,7 @@ class Water:
         # self.equalize()
         # return self
         output = self.copy()
+        output.ice_changes()
         output.equalize()
         return output
 
@@ -107,6 +111,10 @@ class Water:
     def average_sea_level(self) -> np.float16:
         water_pos = self.get_water_position()
         return self.mat[water_pos].mean()
+
+    def update_components(self, ice:Ice):
+        self.ice = ice
+
 
 class Wind:
     """
@@ -134,7 +142,7 @@ class Wind:
         self.alpha = 0.2 # diffusion rate of wind
         # pseudo-random wind spawning variables kind-of sort-of modeled after real world wind movement
         self.sixth = 0
-        w = 10
+        w = 12
         self.new_wind = {0: (w, -w),
                          1: (-w, w),
                          2: (w, -w),
@@ -366,14 +374,14 @@ class Pollution:
         self.wind = wind
         self.spawn_rate = spawn_rate
         self.cleaning_rate = cleaning_rate
-        self.mat = np.zeros(industry.mat.shape, dtype=np.uint8) + START_POLLUTION
+        self.mat = np.zeros(industry.mat.shape, dtype=np.uint16) + START_POLLUTION
 
     def clear_and_spawn(self) -> None:
         delta = (self.spawn_rate * self.industry.mat.astype(np.int16) -
                  self.cleaning_rate * self.forest.mat.astype(np.int16))
-        new_mat = self.mat.astype(np.int16) + delta
-        new_mat = np.clip(new_mat, 0, UINT8_MAX)
-        self.mat = new_mat.astype(np.uint8)
+        new_mat = self.mat.astype(np.int32) + delta
+        # new_mat = np.clip(new_mat, 0, UINT8_MAX)
+        self.mat = new_mat.astype(np.uint16)
 
     def propagate_full_cells(self):
         """have pollution spread to nearby cells if the cell is full"""
@@ -384,8 +392,8 @@ class Pollution:
                    np.roll(change, 1, 1) + np.roll(change, 1, -1))
         change[full] = - (UINT8_MAX - change[full])
         # self.mat += change
-        output = self.mat.astype(np.int16) + change
-        self.mat = output.astype(np.uint8)
+        output = self.mat.astype(np.int32) + change
+        self.mat = output.astype(np.uint16)
 
     def __iter__(self):
         return self
@@ -419,45 +427,46 @@ class Temperature:
 
         # constants
         h = self.water.mat.shape[1]
-        init_temp_equator = 0 # initial temperature at the center of the map
+        init_temp_equator = 20 # initial temperature at the center of the map
         init_temp_between = 10
-        init_temp_pole = -100 # initial temperature at both poles
-        pole_relative_span = 0.1 # fraction of map occupied by either pole (total pole span is double that, two poles innit)
+        init_temp_pole = -10 # initial temperature at both poles
+        pole_relative_span = 0.12 # fraction of map occupied by either pole (total pole span is double that, two poles innit)
         n_pole_range, s_pole_range = (0, int(h * pole_relative_span)), (int((1 - pole_relative_span) * h), h)
         equator_relative_span = 0.1 # fraction of map occupied by the "equator" (center bit)
         equator_radius = h * (equator_relative_span // 2)
         equator_range = (int((h // 2) - equator_radius), int((h // 2) + equator_radius))
-        equator_in = 8 # incoming temperature at the equator cell (from the sun)
+        equator_in = 12 # incoming temperature at the equator cell (from the sun)
+        between_in = 8
         pole_in = 3 # incoming temperature at the poles (from the sun)
-        between_in = (equator_in + pole_in) // 2 # incoming temperature at area between the equator and a pole
+        # between_in = (equator_in + pole_in) // 2 # incoming temperature at area between the equator and a pole
         self.albedo = {# how much incoming heat is reflected back into space, approximated by a flat reduction of incoming
-                       'g': 1, # bare ground
-                       'f': 0, # forest
+                       'g': 2, # bare ground
+                       'f': 1, # forest
                        'w': 0, # water
-                       'i': 3, # ice
+                       'i': 10, # ice
                        'c': 2, # non-rain cloud
                        'r': 4, # rain cloud
                        'p': 0  # pollution
                        }
         self.rad = { # how much heat is radiated back into space
-                        'g': 1,  # bare ground
-                        'f': 0,  # forest
-                        'w': 1,  # water
-                        'i': 1,  # ice
-                        'c': 1,  # non-rain cloud
-                        'r': 1,  # rain cloud
+                        'g': 2,  # bare ground
+                        'f': 2,  # forest
+                        'w': 2,  # water
+                        'i': 2,  # ice
+                        'c': 0,  # non-rain cloud
+                        'r': 0,  # rain cloud
                         'p': 0   # pollution
                         }
         self.greenhouse = { # how much outgoing radiation is reflected back into earth, approximated by a flat reduction
                         'g': 0,  # bare ground
-                        'f': 0,  # forest
+                        'f': 1,  # forest
                         'w': 0,  # water
                         'i': 0,  # ice
                         'c': 0,  # non-rain cloud
                         'r': 0,  # rain cloud
-                        'p': 1  # pollution
+                        'p': 3  # pollution
                         }
-        self.alpha = 0.5 # rate of ambient propagation
+        self.alpha = 0.2 # rate of ambient propagation
 
         # initialize matrices
         # temp - actual temperature of each cell
@@ -477,9 +486,14 @@ class Temperature:
         return np.average(self.temp)
 
     def ambient_diffusion(self):
+        # neighbor_sum = (np.roll(self.temp, 1, 0) + np.roll(self.temp, -1, 0) +
+        #                 np.roll(self.temp, 1, 1) + np.roll(self.temp, -1, 1))
+        # change = np.rint((neighbor_sum // 4) * self.alpha)
         neighbor_sum = (np.roll(self.temp, 1, 0) + np.roll(self.temp, -1, 0) +
-                        np.roll(self.temp, 1, 1) + np.roll(self.temp, -1, 1))
-        change = np.rint((neighbor_sum // 4) * self.alpha)
+                        np.roll(self.temp, 2, 0) + np.roll(self.temp, -2, 0) +
+                        np.roll(self.temp, 1, 1) + np.roll(self.temp, -1, 1) +
+                        np.roll(self.temp, 2, 1) + np.roll(self.temp, -2, 1))
+        change = np.rint((neighbor_sum // 8) * self.alpha)
         self.temp = change.astype(np.int8)
 
     def wind_propagation(self):
@@ -501,6 +515,7 @@ class Temperature:
         return output
 
     def get_greenhouse_matrix(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
+        # TODO: make pollution's contribution proportional to its quantity
         output = np.sum([masks.get(c) * self.greenhouse.get(c) for c in masks.keys()], axis=0)
         return output
 
@@ -547,3 +562,29 @@ class Temperature:
                        np.where(tmp < INT8_MIN, INT8_MIN, tmp))
         output.temp = tmp.astype(np.int8)
         return output
+
+class Ice:
+    """Represents Ice, which removes water when formed by cold and adds water when destroyed by heat"""
+    def __init__(self, water:Water):
+        # initialize matrices and components
+        self.water = water
+        self.temperature = None # add later, can't add it now because Ice and Temperature are co-dependent
+        self.mat = np.zeros(self.water.mat.shape, dtype=np.uint8)
+        # variables
+        initial_volume = 3 # initial number of ice units occupied by a designated initial ice cell
+        # self.water_per_unit = 4 # how much water is stored in every unit of ice
+        # that is, how much water it takes to form an ice unit and how much water we get from a melted ice unit
+        initial_h = self.water.mat.shape[0] // 10 # height of the initial ice sheets, starting from the top/bottom
+        initial_w = int(self.water.mat.shape[1] / 1.5) # width of the initial ice sheet
+        self.freeze_point = 0 # below this temperature (exclusive), water will turn to ice
+        self.thaw_point = 0 # above this temperature (exclusive), ice will turn to water
+        # add initial ice sheets at poles
+        mid_w = self.water.mat.shape[1] // 2
+        h = self.water.mat.shape[0]
+        self.mat[mid_w - (initial_w // 2) : mid_w + (initial_w // 2), 0 : initial_h] = initial_volume
+        self.mat[mid_w - (initial_w // 2) : mid_w + (initial_w // 2), h - initial_h : h] = initial_volume
+
+
+    def update_components(self, water:Water, temperature:Temperature):
+        self.water = water
+        self.temperature = temperature
