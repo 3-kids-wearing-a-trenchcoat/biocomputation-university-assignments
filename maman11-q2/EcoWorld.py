@@ -35,19 +35,23 @@ class EcoWorld:
         self.temperature.ice = self.ice
         # Data trackers
         self.tracker_ptr = 0
+        self.tracker_range = 365
         # average sea level
         self.sea_level = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
+        self.sea_level_z = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float32)
         # total pollution
         self.pollution_tracker = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.uint32)
+        self.pollution_tracker_z = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float32)
         # average temperature
         self.average_temperature = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
+        self.average_temperature_z = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float32)
         # ice volume
-        self.ice_volume = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.uint16)
+        self.ice_volume = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.uint64)
+        self.ice_volume_z = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float32)
         # initialize toggles
         self.show_surface = True
         self.show_pollution_toggle = True
         self.show_temperature_toggle = False
-        self.show_clouds_toggle = False
         # initialize parallelism
         self.executor = ThreadPoolExecutor(max_workers=8)
         atexit.register(self.executor.shutdown, wait=True)
@@ -61,19 +65,27 @@ class EcoWorld:
     def update_trackers(self) -> None:
         # sea level
         self.sea_level[self.tracker_ptr] = self.water.average_sea_level()
+        self.sea_level_z[self.tracker_ptr] = self.get_yearly_z_score(self.sea_level)
         # pollution
         self.pollution_tracker[self.tracker_ptr] = self.pollution.get_total_pollution()
+        self.pollution_tracker_z[self.tracker_ptr] = self.get_yearly_z_score(self.pollution_tracker)
         # temperature
         self.average_temperature[self.tracker_ptr] = self.temperature.get_average()
+        self.average_temperature_z[self.tracker_ptr] = self.get_yearly_z_score(self.average_temperature)
         # ice volume
         self.ice_volume[self.tracker_ptr] = self.ice.ice_volume()
+        self.ice_volume_z[self.tracker_ptr] = self.get_yearly_z_score(self.ice_volume)
         # update tracker ptr and resize if needed
         self.tracker_ptr += 1
         if self.tracker_ptr == self.sea_level.shape[0]:
             self.sea_level = self.double_array_size(self.sea_level)
+            self.sea_level_z = self.double_array_size(self.sea_level_z)
             self.pollution_tracker = self.double_array_size(self.pollution_tracker)
+            self.pollution_tracker_z = self.double_array_size(self.pollution_tracker_z)
             self.average_temperature = self.double_array_size(self.average_temperature)
+            self.average_temperature_z = self.double_array_size(self.average_temperature_z)
             self.ice_volume = self.double_array_size(self.ice_volume)
+            self.ice_volume_z = self.double_array_size(self.ice_volume_z)
 
     def update_component_pointers(self):
         self.ice = self.water.ice
@@ -83,6 +95,19 @@ class EcoWorld:
         self.pollution.update_components(self.industry, self.forest, self.wind)
         self.temperature.update_components(self.water, self.wind, self.pollution, self.forest, self.ice)
         self.ice.update_components(self.water, self.temperature)
+
+    def get_yearly_z_score(self, history:NDArray):
+        """return the z-score of this iteration relative to the last "year" (365 iterations)"""
+        # if self.tracker_ptr < sample_range:
+        #     return self.get_yearly_z_score(history, self.tracker_ptr)
+        if self.tracker_ptr < self.tracker_range:
+            return np.nan
+        mu = history[self.tracker_ptr - self.tracker_range: self.tracker_ptr].mean()
+        sigma = np.std(history[self.tracker_ptr - self.tracker_range: self.tracker_ptr])
+        if sigma == 0:
+            return 0
+        return (history[self.tracker_ptr] - mu) // sigma
+
 
     def __iter__(self):
         return self
@@ -175,15 +200,24 @@ class EcoWorld:
     def ice_volume_history(self):
         return self.ice_volume[:self.tracker_ptr]
 
+    def sea_level_history_z(self):
+        return self.sea_level_z[:self.tracker_ptr]
+
+    def pollution_history_z(self):
+        return self.pollution_tracker_z[:self.tracker_ptr]
+
+    def temperature_history_z(self):
+        return self.average_temperature_z[:self.tracker_ptr]
+
+    def ice_volume_history_z(self):
+        return self.ice_volume_z[:self.tracker_ptr]
+
     # toggle functions tied to GUI checkboxes and buttons
     def pollution_toggle(self, checked: bool):
         self.show_pollution_toggle = checked
 
     def temperature_toggle(self, checked: bool):
         self.show_temperature_toggle = checked
-
-    def clouds_toggle(self, checked: bool):
-        self.show_clouds_toggle = checked
 
     def surface_toggle(self, checked: bool):
         self.show_surface = checked

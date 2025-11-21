@@ -2,8 +2,6 @@ from __future__ import annotations
 import pyqtgraph as pg
 from PyQt6 import QtWidgets, QtCore, QtGui
 from pyqtgraph.Qt import mkQApp, QtCore
-from pyqtgraph.widgets import RemoteGraphicsView, GraphicsLayoutWidget
-# import pyqtgraph.opengl as gl
 import EcoWorld as ew
 
 class MainWindow (QtWidgets.QMainWindow):
@@ -13,10 +11,18 @@ class MainWindow (QtWidgets.QMainWindow):
             next(self.world) # advance world
         self.map.setImage(self.world.get_map()) # set map
         # set sea level plot
-        self.sea_level_plot.plot(self.world.sea_level_history(), clear=True, _callSync='off')
-        self.pollution_plot.plot(self.world.pollution_history(), clear=True, _callSync='off')
-        self.temp_plot.plot(self.world.temperature_history(), clear=True, _callSync='off')
-        self.ice_plot.plot(self.world.ice_volume_history(), clear=True, _callSync='off')
+        # self.sea_level_plot.plot(self.world.sea_level_history(), clear=True, _callSync='off')
+        self.sea_level_curve.setData(self.world.sea_level_history())
+        self.sea_level_curve_z.setData(self.world.sea_level_history_z())
+        # self.pollution_plot.plot(self.world.pollution_history(), clear=True, _callSync='off')
+        self.pollution_curve.setData(self.world.pollution_history())
+        self.pollution_curve_z.setData(self.world.pollution_history_z())
+        # self.temp_plot.plot(self.world.temperature_history(), clear=True, _callSync='off')
+        self.temp_curve.setData(self.world.temperature_history())
+        self.temp_curve_z.setData(self.world.temperature_history_z())
+        # self.ice_plot.plot(self.world.ice_volume_history(), clear=True, _callSync='off')
+        self.ice_curve.setData(self.world.ice_volume_history())
+        self.ice_curve_z.setData(self.world.ice_volume_history_z())
 
     def pause_func(self):
         self.paused = not self.paused
@@ -40,7 +46,7 @@ class MainWindow (QtWidgets.QMainWindow):
         self.show()
 
         # set map
-        self.map_layout = win.addLayout(row=0, col=1)
+        self.map_layout = win.addLayout(row=0, col=2)
         self.map_layout.addLabel("world map")
         self.map_layout.nextRow()
         self.map_view = self.map_layout.addViewBox(lockAspect=True)
@@ -48,33 +54,57 @@ class MainWindow (QtWidgets.QMainWindow):
         self.map.setImage(self.world.get_map())
         self.map_view.addItem(self.map)
         # trackers
-        self.tracker_layout = win.addLayout(row=0, col=0)
+        self.tracker_layout = win.addLayout(row=0, col=1)
         self.tracker_layout.addLabel("Data")
-        self.tracker_layout.setMaximumWidth(600)
+        self.tracker_layout.setMaximumWidth(350)
         # sea level
         self.tracker_layout.nextRow()
         self.sea_level_plot = self.tracker_layout.addPlot(title="Average sea level")
         self.sea_level_plot.setClipToView(True)
         self.sea_level_plot.setDownsampling(mode='peak')
         self.sea_level_curve = self.sea_level_plot.plot(self.world.sea_level_history())
+        # self.sea_level_curve_z = self.sea_level_plot.plot(pen=({'color': 'yellow'}))
         # total pollution
         self.tracker_layout.nextRow()
         self.pollution_plot = self.tracker_layout.addPlot(title="Total pollution")
         self.pollution_plot.setClipToView(True)
         self.pollution_plot.setDownsampling(mode='peak')
         self.pollution_curve = self.pollution_plot.plot(self.world.pollution_history())
+        # self.pollution_curve_z = self.pollution_plot.plot(pen=({'color': 'yellow'}))
         # average temperature
         self.tracker_layout.nextRow()
         self.temp_plot = self.tracker_layout.addPlot(title="Average Temperature")
         self.temp_plot.setClipToView(True)
         self.temp_plot.setDownsampling(mode='peak')
         self.temp_curve = self.temp_plot.plot(self.world.temperature_history())
+        # self.temp_curve_z = self.temp_plot.plot(pen=({'color': 'yellow'}))
         # ice volume
         self.tracker_layout.nextRow()
         self.ice_plot = self.tracker_layout.addPlot(title="Total Ice Volume")
         self.ice_plot.setClipToView(True)
         self.ice_plot.setDownsampling(mode='peak')
         self.ice_curve = self.ice_plot.plot(self.world.ice_volume_history())
+        # self.ice_curve_z = self.ice_plot.plot(pen=({'color': 'yellow'}))
+        # z-score plots
+        self.z_layout = win.addLayout(row=0, col=0)
+        self.z_layout.addLabel("Data Z-Score")
+        self.z_layout.setMaximumWidth(350)
+        # sea level
+        self.z_layout.nextRow()
+        self.sea_plot_z = self.z_layout.addPlot(title="Average Sea Level")
+        self.sea_level_curve_z = self.sea_plot_z.plot(self.world.sea_level_history_z(), pen=({'color': 'yellow'}))
+        # pollution
+        self.z_layout.nextRow()
+        self.pollution_plot_z = self.z_layout.addPlot(title="Total Pollution")
+        self.pollution_curve_z = self.pollution_plot_z.plot(self.world.pollution_history_z(), pen=({'color': 'yellow'}))
+        # temperature
+        self.z_layout.nextRow()
+        self.temp_plot_z = self.z_layout.addPlot(title="Average Temperature")
+        self.temp_curve_z = self.temp_plot_z.plot(self.world.temperature_history_z(), pen=({'color': 'yellow'}))
+        # ice
+        self.z_layout.nextRow()
+        self.ice_plot_z = self.z_layout.addPlot(title="Total Ice Volume")
+        self.ice_curve_z = self.ice_plot_z.plot(self.world.ice_volume_history_z(), pen=({'color': 'yellow'}))
 
         # options
         self.opt_dock = QtWidgets.QDockWidget("Options", self)
@@ -100,18 +130,10 @@ class MainWindow (QtWidgets.QMainWindow):
         self.temperature_toggle.setChecked(self.world.show_temperature_toggle)
         self.temperature_toggle.toggled.connect(self.world.temperature_toggle)
         self.opt_layout.addWidget(self.temperature_toggle)
-        # cloud toggle
-        self.clouds_toggle = QtWidgets.QCheckBox("show clouds")
-        self.clouds_toggle.setChecked(self.world.show_clouds_toggle)
-        self.clouds_toggle.toggled.connect(self.world.clouds_toggle)
-        self.opt_layout.addWidget(self.clouds_toggle)
         # set options dock in window
         self.opt_layout.addStretch(1)
         self.opt_dock.setWidget(self.opt_widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.opt_dock)
-
-        # cross-hair, for inspecting each cell's value
-        # TODO
         # timer (for plot update)
         self.timer = pg.QtCore.QTimer()
         self.timer.timeout.connect(self.update)

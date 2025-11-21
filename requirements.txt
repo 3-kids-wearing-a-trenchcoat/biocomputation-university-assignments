@@ -1,0 +1,9 @@
+click==8.3.0
+llvmlite==0.46.0b1
+numpy==2.3.4
+PyQt6==6.10.0
+PyQt6-Qt6==6.10.0
+PyQt6_sip==13.10.2
+pyqtgraph==0.13.7
+qt6-applications==6.5.0.2.3
+tqdm==4.67.1

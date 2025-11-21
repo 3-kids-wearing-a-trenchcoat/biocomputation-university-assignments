@@ -9,17 +9,17 @@ DEFAULT_SIZE = 500
 INT8_MIN = -128
 INT8_MAX = 127
 UINT8_MAX = 255
-SURFACE_STATES = 30
+SURFACE_STATES = 50
 # component-specific constants
 DEFAULT_LAND_PORTION = 0.3 # portion of the surface that is made up of (initially) dry land
 DEFAULT_FOREST_COVERAGE = 0.3 # portion of dry land covered by forest
 DEFAULT_FOREST_GERMINATION = 20 # maximum number of cells from germination center for forest
 DEFAULT_INDUSTRY_GERM_LIMIT = 3
 DEFAULT_INDUSTRY_QUANTITY = 700 # number of cells on dry land to be designated as industrial tiles
-DEFAULT_POLLUTION_RATE = 50 # how much pollution each industry tile spawns at each iteration
+DEFAULT_POLLUTION_RATE = 0 # how much pollution each industry tile spawns at each iteration
 DEFAULT_FOREST_CLEANING_RATE = 1 # how much pollution each forest tile removes at each iteration
 START_POLLUTION = 0 # how much pollution should each cell start out with, mostly for debugging
-WIND_STATES = 200 # maximum wind speed in any direction
+WIND_STATES = 120 # maximum wind speed in any direction
 
 class Surface:
     """Representing the world surface, each cell is described by surface elevation relative to some initial sea level"""
@@ -146,22 +146,16 @@ class Wind:
         self.sn = np.zeros((water.mat.shape[0], water.mat.shape[1]), dtype=np.int64) # south-north wind
         self.ew = np.zeros_like(self.sn) # east-west wind
         self.vert = True # whether the wind in this iteration is vertical (sn) or horizontal (ew)
-        self.alpha = 0.2 # diffusion rate of wind
+        self.alpha = 0.02 # diffusion rate of wind
         # pseudo-random wind spawning variables kind-of sort-of modeled after real world wind movement
         self.sixth = 0
-        w = 10
-        # self.new_wind = {0: (w, -w),
-        #                  1: (-w, w),
-        #                  2: (w, -w),
-        #                  3: (-w, -w),
-        #                  4: (w, w),
-        #                  5: (-w, -w)}
-        self.new_wind = {0: (0, w),
-                         1: (w, -w),
-                         2: (w, 0),
+        w = 40
+        self.new_wind = {0: (w, w),
+                         1: (-w, w),
+                         2: (-w, 0),
                          3: (-w, 0),
-                         4: (-w, w),
-                         5: (0, -w)}
+                         4: (-w, -w),
+                         5: (-w, -w)}
 
         self.sixth_length = self.sn.shape[0] // 6
         self.add_new_wind = True
@@ -180,7 +174,7 @@ class Wind:
                      np.roll(calm, 1, 1) & np.roll(calm, -1, 1))
         spawn_mask = np.zeros(output_sn.shape, dtype=bool)
         spawn_start = self.sixth_length * self.sixth
-        spawn_end = spawn_start + self.sixth_length
+        spawn_end = spawn_start + self.sixth_length + 1
         spawn_mask[...,spawn_start : spawn_end] = True
         spawn_mask = spawn_mask & calm
         output_sn[...,spawn_mask] = self.new_wind[self.sixth][0]
@@ -222,13 +216,9 @@ class Wind:
 
     def wind_interaction(self) -> tuple[NDArray[np.int16], NDArray[np.int16]]:
         sn_sum, ew_sum = self.sum_with_wind_erosion()
-        # # clip values to WIND_STATES
-        # sn_sum, ew_sum = np.clip(sn_sum, -WIND_STATES, WIND_STATES), np.clip(ew_sum, -WIND_STATES, WIND_STATES)
         # get averages
         sn_avg, ew_avg = sn_sum // 4, ew_sum // 4
         # apply wind diffusion and return
-        # output_sn = self.alpha * np.rint(sn_avg).astype(np.int64)
-        # output_ew = self.alpha * np.rint(ew_avg).astype(np.int64)
         output_sn = (1 - self.alpha) * self.sn + (self.alpha * np.rint(sn_avg).astype(np.int64))
         output_ew = (1 - self.alpha) * self.ew + (self.alpha * np.rint(ew_avg).astype(np.int64))
         # clip values to WIND_STATES
@@ -257,8 +247,6 @@ class Wind:
         e_movers -= np.roll(e_movers, 1, 1)
         w_movers = np.where(self.move_w, -smat, 0)
         w_movers -= np.roll(w_movers, -1, 1)
-        # output = smat + s_movers + n_movers + e_movers + w_movers
-        # return output.astype(np.uint8)
         if self.vert:
             return (smat + s_movers + n_movers).astype(output_type)
         return (smat + e_movers + w_movers).astype(output_type)
@@ -357,10 +345,6 @@ class Industry:
             total = 0
             while total < num:
                 x, y = rnd_gen.choice(self.free_coords)
-                # self.mat[x][y] = True
-                # self.free_coords.remove((x,y))
-                # total += 1
-                # pbar.update(1)
                 new_tiles = self.germinate_industry(x, y, germ_limit, land_map, forest.mat)
                 pbar.update(new_tiles)
                 total += new_tiles
@@ -398,17 +382,12 @@ class Pollution:
         new_mat = np.clip(new_mat, 0, UINT8_MAX)
         self.mat = new_mat.astype(np.uint16)
 
-    def propagate_full_cells(self):
-        """have pollution spread to nearby cells if the cell is full"""
-        full = np.where(self.mat == UINT8_MAX, True, False).astype(np.bool)
-        change = np.zeros(self.mat.shape, dtype=np.int16)
-        change[full] = UINT8_MAX // 5
-        change += (np.roll(change, 1, 0) + np.roll(change, -1, 0) +
-                   np.roll(change, 1, 1) + np.roll(change, 1, -1))
-        change[full] = - (UINT8_MAX - change[full])
-        # self.mat += change
-        output = self.mat.astype(np.int32) + change
-        self.mat = output.astype(np.uint16)
+
+    def ambient_propagation(self):
+        prop = np.where(self.mat >= 5, True, False)
+        self.mat[prop] -= 4
+        self.mat += (np.where(np.roll(prop, 1, 0), 1, 0) + np.where(np.roll(prop, -1, 0), 1, 0) +
+                     np.where(np.roll(prop, 1, 1), 1, 0) + np.where(np.roll(prop, -1, 1), 1, 0)).astype(np.uint8)
 
     def __iter__(self):
         return self
@@ -417,9 +396,8 @@ class Pollution:
         output = copy.copy(self)
         output.mat = self.mat.copy()
         output.clear_and_spawn()
-        # output.wind_propagation()
         output.mat = self.wind.wind_propagation(output.mat.astype(np.uint8))
-        output.propagate_full_cells()
+        output.ambient_propagation()
         return output
 
     def get_total_pollution(self) -> np.float32:
@@ -433,13 +411,12 @@ class Pollution:
 class Temperature:
     """Representing temperature and the way it changes due to the sun, greenhouse effects and albedo"""
     def __init__(self, water:Water, wind:Wind, pollution:Pollution, forest:Forest):
-        # TODO: add clouds to Temperature
         # set related components
         self.water = water
         self.wind = wind
         self.pollution = pollution
         self.forest = forest
-        self.ice = None # update explicitely after constructor
+        self.ice = None # update explicitly after constructor
 
         # constants
         h = self.water.mat.shape[1]
@@ -451,17 +428,15 @@ class Temperature:
         equator_relative_span = 0.1 # fraction of map occupied by the "equator" (center bit)
         equator_radius = h * (equator_relative_span // 2)
         equator_range = (int((h // 2) - equator_radius), int((h // 2) + equator_radius))
-        equator_in = 12 # incoming temperature at the equator cell (from the sun)
-        between_in = 8
-        pole_in = 4 # incoming temperature at the poles (from the sun)
+        equator_in = 25 # incoming temperature at the equator cell (from the sun)
+        between_in = 15
+        pole_in = 10 # incoming temperature at the poles (from the sun)
         # between_in = (equator_in + pole_in) // 2 # incoming temperature at area between the equator and a pole
         self.albedo = {# how much incoming heat is reflected back into space, approximated by a flat reduction of incoming
                        'g': 2, # bare ground
                        'f': 1, # forest
-                       'w': 0, # water
-                       'i': 10, # ice
-                       'c': 2, # non-rain cloud
-                       'r': 4, # rain cloud
+                       'w': 1, # water
+                       'i': 8, # ice
                        'p': 0  # pollution
                        }
         self.rad = { # how much heat is radiated back into space
@@ -469,8 +444,6 @@ class Temperature:
                         'f': 3,  # forest
                         'w': 3,  # water
                         'i': 3,  # ice
-                        'c': 0,  # non-rain cloud
-                        'r': 0,  # rain cloud
                         'p': 0   # pollution
                         }
         self.greenhouse = { # how much outgoing radiation is reflected back into earth, approximated by a flat reduction
@@ -478,11 +451,9 @@ class Temperature:
                         'f': 1,  # forest
                         'w': 0,  # water
                         'i': 0,  # ice
-                        'c': 0,  # non-rain cloud
-                        'r': 0,  # rain cloud
-                        'p': 6  # pollution
+                        'p': 1  # pollution
                         }
-        self.alpha = 0.05 # rate of ambient propagation
+        self.alpha = 0.1 # rate of ambient propagation
 
         # initialize matrices
         # temp - actual temperature of each cell
@@ -502,16 +473,12 @@ class Temperature:
         return np.average(self.temp)
 
     def ambient_diffusion(self):
-        # neighbor_sum = (np.roll(self.temp, 1, 0) + np.roll(self.temp, -1, 0) +
-        #                 np.roll(self.temp, 1, 1) + np.roll(self.temp, -1, 1))
-        # change = np.rint((neighbor_sum // 4) * self.alpha)
         neighbor_sum = (np.roll(self.temp, 1, 0) + np.roll(self.temp, -1, 0) +
                         np.roll(self.temp, 2, 0) + np.roll(self.temp, -2, 0) +
                         np.roll(self.temp, 1, 1) + np.roll(self.temp, -1, 1) +
                         np.roll(self.temp, 2, 1) + np.roll(self.temp, -2, 1))
         change = np.rint((neighbor_sum // 8) * self.alpha)
         self.temp = change.astype(np.int8)
-        # self.temp = (self.temp * (1 - self.alpha)) + (self.alpha * change)
 
     def wind_propagation(self):
         self.temp = self.wind.wind_propagation(self.temp, np.int8)
@@ -521,7 +488,6 @@ class Temperature:
         self.wind_propagation()
 
     def update_components(self, water:Water, wind:Wind, pollution:Pollution, forest:Forest, ice:Ice):
-        # TODO: add ice and clouds
         self.wind = wind
         self.water = water
         self.pollution = pollution
@@ -533,8 +499,9 @@ class Temperature:
         return output
 
     def get_greenhouse_matrix(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
-        # TODO: make pollution's contribution proportional to its quantity
         output = np.sum([masks.get(c) * self.greenhouse.get(c) for c in masks.keys()], axis=0)
+        # make pollution's greenhouse effect relative to its density in the cell
+        output += np.where(self.pollution.mat > 0, self.pollution.mat - 1, 0)
         return output
 
     def get_incoming_heat(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
@@ -564,13 +531,10 @@ class Temperature:
         output.temp = self.temp.copy()
 
         output.propagate()
-        # TODO: add clouds
         masks = {'f': self.forest.mat,  # forest
                  'w': self.water.get_water_position(),  # water
                  'i': self.ice.get_ice_mask(),  # ice
                  'g': np.logical_not(self.forest.mat & self.water.get_water_position()),  # bare ground
-                 # 'c': 0,  # non-rain cloud
-                 # 'r': 0,  # rain cloud
                  'p': np.where(self.pollution.mat > 0, True, False).astype(np.bool)  # pollution
                 }
         change = self.get_incoming_heat(masks) - self.get_outgoing_heat(masks)
@@ -592,11 +556,11 @@ class Ice:
         self.temperature = None # add later, can't add it now because Ice and Temperature are co-dependent
         self.mat = np.zeros(self.water.mat.shape, dtype=np.uint8)
         # variables
-        initial_volume = 1 # initial number of ice units occupied by a designated initial ice cell
+        initial_volume = 50 # initial number of ice units occupied by a designated initial ice cell
         self.max_volume = 50 # maximum amount of ice in a cell
         initial_h = self.water.mat.shape[0] // 10 # height of the initial ice sheets, starting from the top/bottom
         initial_w = int(self.water.mat.shape[1] / 1.5) # width of the initial ice sheet
-        self.freeze_point = -1 # below this temperature (exclusive), water will turn to ice
+        self.freeze_point = -5 # below this temperature (exclusive), water will turn to ice
         self.thaw_point = 0 # above this temperature (exclusive), ice will turn to water
         # spacing out freeze and thaw points should add some stability to ice and stop it from blinking
         # add initial ice sheets at poles
