@@ -5,7 +5,7 @@ from tqdm import tqdm
 import copy
 
 # constants
-DEFAULT_SIZE = 300
+DEFAULT_SIZE = 500
 INT8_MIN = -128
 INT8_MAX = 127
 UINT8_MAX = 255
@@ -86,17 +86,13 @@ class Water:
         Water moves from one cell to another if the other cell's height (including water) is lower than this one's"""
         [self.directional_equalize(i, j) for i, j in ((1,0), (-1,0), (1,1), (-1,1))]
 
-    def ice_changes(self):
-        return
-
     def __iter__(self) -> Water:
         return self
 
     def __next__(self) -> Water:
-        # self.equalize()
-        # return self
         output = self.copy()
-        output.ice_changes()
+        # since water's next move depends on ice, water calls on ice's next and waits until it's done
+        output.ice = next(output.ice)
         output.equalize()
         return output
 
@@ -114,6 +110,9 @@ class Water:
 
     def update_components(self, ice:Ice):
         self.ice = ice
+
+    def get_only_water(self):
+        return (self.mat - self.surface.mat).astype(np.uint8)
 
 
 class Wind:
@@ -424,6 +423,7 @@ class Temperature:
         self.wind = wind
         self.pollution = pollution
         self.forest = forest
+        self.ice = None # update explicitely after constructor
 
         # constants
         h = self.water.mat.shape[1]
@@ -503,12 +503,13 @@ class Temperature:
         self.ambient_diffusion()
         self.wind_propagation()
 
-    def update_components(self, water:Water, wind:Wind, pollution:Pollution, forest:Forest):
+    def update_components(self, water:Water, wind:Wind, pollution:Pollution, forest:Forest, ice:Ice):
         # TODO: add ice and clouds
         self.wind = wind
         self.water = water
         self.pollution = pollution
         self.forest = forest
+        self.ice = ice
 
     def get_albedo_matrix(self, masks: dict[str, NDArray[np.bool]]) -> NDArray[np.int8]:
         output = np.sum([masks.get(c) * self.albedo.get(c) for c in masks.keys()], axis=0)
@@ -546,10 +547,10 @@ class Temperature:
         output.temp = self.temp.copy()
 
         output.propagate()
-        # TODO: add ice and clouds
+        # TODO: add clouds
         masks = {'f': self.forest.mat,  # forest
                  'w': self.water.get_water_position(),  # water
-                 # 'i': 0,  # ice
+                 'i': self.ice.get_ice_mask(),  # ice
                  'g': np.logical_not(self.forest.mat & self.water.get_water_position()),  # bare ground
                  # 'c': 0,  # non-rain cloud
                  # 'r': 0,  # rain cloud
@@ -563,28 +564,124 @@ class Temperature:
         output.temp = tmp.astype(np.int8)
         return output
 
+
 class Ice:
-    """Represents Ice, which removes water when formed by cold and adds water when destroyed by heat"""
+    """Represents Ice, which removes water when formed by cold and adds water when destroyed by heat.
+    Each unit of Ice is worth 1 unit of water."""
     def __init__(self, water:Water):
         # initialize matrices and components
         self.water = water
+        self.water_mask = self.water.get_water_position()
         self.temperature = None # add later, can't add it now because Ice and Temperature are co-dependent
         self.mat = np.zeros(self.water.mat.shape, dtype=np.uint8)
         # variables
         initial_volume = 3 # initial number of ice units occupied by a designated initial ice cell
-        # self.water_per_unit = 4 # how much water is stored in every unit of ice
-        # that is, how much water it takes to form an ice unit and how much water we get from a melted ice unit
+        self.max_volume = 3 # maximum amount of ice in a cell
         initial_h = self.water.mat.shape[0] // 10 # height of the initial ice sheets, starting from the top/bottom
         initial_w = int(self.water.mat.shape[1] / 1.5) # width of the initial ice sheet
-        self.freeze_point = 0 # below this temperature (exclusive), water will turn to ice
-        self.thaw_point = 0 # above this temperature (exclusive), ice will turn to water
+        self.freeze_point = -2 # below this temperature (exclusive), water will turn to ice
+        self.thaw_point = 2 # above this temperature (exclusive), ice will turn to water
+        # spacing out freeze and thaw points should add some stability to ice and stop it from blinking
         # add initial ice sheets at poles
         mid_w = self.water.mat.shape[1] // 2
         h = self.water.mat.shape[0]
         self.mat[mid_w - (initial_w // 2) : mid_w + (initial_w // 2), 0 : initial_h] = initial_volume
         self.mat[mid_w - (initial_w // 2) : mid_w + (initial_w // 2), h - initial_h : h] = initial_volume
+        self.ice_mask = np.where(self.mat > 0, True, False).astype(np.bool)
 
+    # def ice_in_neighborhood_mask(self):
+    #     """Get a boolean mask representing whether a cell has ice or is a neighbor of ice"""
+    #     return (np.roll(self.ice_mask, 1, 0) & np.roll(self.ice_mask, -1, 0) &
+    #             np.roll(self.ice_mask, 1, 1) & np.roll(self.ice_mask, -1, 1))
+
+    def get_freezing_water_mask(self) -> NDArray[np.bool]:
+        """Get a mask of spots cells where ice will be formed in this iteration.
+        New Ice is created in cells that are below freezing, have water and neighbor an ice cell"""
+        freezing = self.temperature.temp < self.freeze_point
+        freezing_water = freezing & self.water_mask
+        return freezing_water
+
+    def absorb_water(self, freezing_water:NDArray[np.bool]):
+        """Ice cells that are below the maximum volume will absorb water below the freezing point from their
+        neighborhood. at each iteration, an ice cell may only absorb one water unit.
+        The directions that are checked for freezing water in order are north, east, west, south.
+        the ice will absorb one unit of water from the first direction that meets the requirements"""
+        output = self.mat.copy().astype(np.int16)
+        fwater = freezing_water
+        growing_ice = self.ice_mask & (np.where(self.mat < np.full_like(self.mat, self.max_volume), True, False))
+        for shift, axis in [(-1, 0), (1, 1), (-1, 1), (1, 0)]:
+            # find ice that has freezing water in the right direction
+            this_growth = growing_ice & np.roll(fwater, shift, axis)
+            # add 1 to all ice cells which meet the above requirements
+            change = np.where(this_growth, 1, 0).astype(np.bool)
+            # remove these ice blocks that just absorbed water from consideration in this iteration
+            # growing_ice -= this_growth
+            growing_ice &= ~this_growth
+            # remove water cells that just lost water from further consideration in this iteration
+            fwater &= ~np.roll(change, shift, axis)
+            # remove the water that was just absorbed
+            self.water.mat -= np.roll(change, shift, axis)
+            # update new matrix
+            output += change
+        # set new matrix
+        self.mat = output.astype(np.uint8)
+
+    def nucleate(self, freezing_water:NDArray[np.bool], exclusion_mask:NDArray[np.bool]):
+        """
+        Create new ice wherever water is below freezing.
+        A cell with N water units that is below freezing will turn into a cell with N ice units UNLESS
+        N is greater than the max volume, in which case this cell will be ignored.
+        :param freezing_water: mask of water that is below freezing point
+        :param exclusion_mask: cells to ignore in this check, typically cells which were just changed
+        """
+        nucleation_mask: NDArray[np.bool] = freezing_water & ~exclusion_mask
+        change = self.water.get_only_water()[nucleation_mask]
+        change = np.where(change >= self.max_volume, 0, change) # ignore changes that would violate max ice volume
+        self.water.mat[nucleation_mask] = 0
+        self.mat[nucleation_mask] += change
+
+    def thaw(self):
+        """Ice cells whose temperature is above the thaw point and have a non-ice neighbor will lose one
+        unit of ice and spawn a unit of water in the first neighbor checked which is not ice.
+        The directions checked are (in order): north, east, west, south."""
+        # find all ice cells which are above the thawing point
+        thawing = self.ice_mask & np.where(self.temperature.temp > self.thaw_point, True, False)
+        # for each direction
+        for shift, axis in [(-1, 0), (1, 1), (-1, 1), (1, 0)]:
+            # reduce by 1 the volume of all ice cells which are thawing and have a free neighbor in this direction
+            change = np.where(thawing & np.roll(~self.ice_mask, shift, axis), True, False)
+            # remove the changed cells from consideration for this iteration
+            thawing &= ~change
+            # reduce ice volume
+            self.mat[change] = self.mat[change] - 1
+            # increase water level in the checked direction
+            self.water.mat += np.roll(change, shift, axis).astype(np.uint8)
+
+
+
+    def __iter__(self):
+        return  self
+
+    def __next__(self):
+        output = copy.copy(self)
+        freezing_water = self.get_freezing_water_mask()
+        output.absorb_water(freezing_water) # ice below maximum volume absorbs water
+        nucleation_exclusion_mat = np.where(self.mat != output.mat, True, False)
+        # frozen water that hasn't been 'touched' in this iteration turns into ice
+        output.nucleate(freezing_water, nucleation_exclusion_mat)
+        # thaw
+        output.thaw()
+        # update ice mask
+        output.ice_mask = np.where(output.mat > 0, True, False).astype(np.bool)
+        return output
 
     def update_components(self, water:Water, temperature:Temperature):
         self.water = water
+        self.water_mask = self.water.get_water_position()
         self.temperature = temperature
+
+    def ice_volume(self) -> np.uint16:
+        return np.sum(self.mat)
+
+    def get_ice_mask(self) -> NDArray[np.bool]:
+        return np.where(self.mat > 0, True, False)

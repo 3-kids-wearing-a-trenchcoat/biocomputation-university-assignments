@@ -32,6 +32,7 @@ class EcoWorld:
         self.ice = Ice(self.water)
         self.ice.temperature = self.temperature # add explicitly as this couldn't be in Ice's init
         self.water.ice = self.ice
+        self.temperature.ice = self.ice
         # Data trackers
         self.tracker_ptr = 0
         # average sea level
@@ -40,8 +41,8 @@ class EcoWorld:
         self.pollution_tracker = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.uint32)
         # average temperature
         self.average_temperature = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.float16)
-        # min/max
-
+        # ice volume
+        self.ice_volume = np.zeros(INITIAL_HISTORY_SIZE, dtype=np.uint16)
         # initialize toggles
         self.show_surface = True
         self.show_pollution_toggle = True
@@ -64,26 +65,31 @@ class EcoWorld:
         self.pollution_tracker[self.tracker_ptr] = self.pollution.get_total_pollution()
         # temperature
         self.average_temperature[self.tracker_ptr] = self.temperature.get_average()
+        # ice volume
+        self.ice_volume[self.tracker_ptr] = self.ice.ice_volume()
         # update tracker ptr and resize if needed
         self.tracker_ptr += 1
         if self.tracker_ptr == self.sea_level.shape[0]:
             self.sea_level = self.double_array_size(self.sea_level)
             self.pollution_tracker = self.double_array_size(self.pollution_tracker)
             self.average_temperature = self.double_array_size(self.average_temperature)
+            self.ice_volume = self.double_array_size(self.ice_volume)
 
     def update_component_pointers(self):
+        self.ice = self.water.ice
         self.wind.update_components(self.water)
         self.forest.update_components(self.water)
         self.industry.update_components(self.water)
         self.pollution.update_components(self.industry, self.forest, self.wind)
-        self.temperature.update_components(self.water, self.wind, self.pollution, self.forest)
+        self.temperature.update_components(self.water, self.wind, self.pollution, self.forest, self.ice)
+        self.ice.update_components(self.water, self.temperature)
 
     def __iter__(self):
         return self
 
     def __next__(self):
         # advance components by one step
-        comp_names = ["water", "wind", "forest", "industry", "pollution", "temperature"]
+        comp_names = ["water", "temperature", "wind", "pollution", "forest", "industry"]
         futures = {name: self.executor.submit(next, getattr(self, name))
                    for name in comp_names}
         for name, fut in futures.items():
@@ -165,6 +171,9 @@ class EcoWorld:
 
     def temperature_history(self):
         return self.average_temperature[:self.tracker_ptr]
+
+    def ice_volume_history(self):
+        return self.ice_volume[:self.tracker_ptr]
 
     # toggle functions tied to GUI checkboxes and buttons
     def pollution_toggle(self, checked: bool):

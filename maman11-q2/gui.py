@@ -16,6 +16,7 @@ class MainWindow (QtWidgets.QMainWindow):
         self.sea_level_plot.plot(self.world.sea_level_history(), clear=True, _callSync='off')
         self.pollution_plot.plot(self.world.pollution_history(), clear=True, _callSync='off')
         self.temp_plot.plot(self.world.temperature_history(), clear=True, _callSync='off')
+        self.ice_plot.plot(self.world.ice_volume_history(), clear=True, _callSync='off')
 
     def pause_func(self):
         self.paused = not self.paused
@@ -68,6 +69,12 @@ class MainWindow (QtWidgets.QMainWindow):
         self.temp_plot.setClipToView(True)
         self.temp_plot.setDownsampling(mode='peak')
         self.temp_curve = self.temp_plot.plot(self.world.temperature_history())
+        # ice volume
+        self.tracker_layout.nextRow()
+        self.ice_plot = self.tracker_layout.addPlot(title="Total Ice Volume")
+        self.ice_plot.setClipToView(True)
+        self.ice_plot.setDownsampling(mode='peak')
+        self.ice_curve = self.ice_plot.plot(self.world.ice_volume_history())
 
         # options
         self.opt_dock = QtWidgets.QDockWidget("Options", self)
