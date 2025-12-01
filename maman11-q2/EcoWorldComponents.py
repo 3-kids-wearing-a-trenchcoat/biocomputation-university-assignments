@@ -5,7 +5,7 @@ from tqdm import tqdm
 import copy
 
 # constants
-DEFAULT_SIZE = 300
+DEFAULT_SIZE = 400
 INT8_MIN = -128
 INT8_MAX = 127
 UINT8_MAX = 255
@@ -16,7 +16,7 @@ DEFAULT_FOREST_COVERAGE = 0.2 # portion of dry land covered by forest
 DEFAULT_FOREST_GERMINATION = 20 # maximum number of cells from germination center for forest
 DEFAULT_INDUSTRY_GERM_LIMIT = 3
 DEFAULT_INDUSTRY_QUANTITY = 700 # number of cells on dry land to be designated as industrial tiles
-DEFAULT_POLLUTION_RATE = 15 # how much pollution each industry tile spawns at each iteration
+DEFAULT_POLLUTION_RATE = 50 # how much pollution each industry tile spawns at each iteration
 DEFAULT_FOREST_CLEANING_RATE = 1 # how much pollution each forest tile removes at each iteration
 START_POLLUTION = 0 # how much pollution should each cell start out with, mostly for debugging
 WIND_STATES = 120 # maximum wind speed in any direction
