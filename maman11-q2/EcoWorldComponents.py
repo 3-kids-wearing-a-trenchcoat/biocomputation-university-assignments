@@ -12,7 +12,7 @@ UINT8_MAX = 255
 SURFACE_STATES = 50
 # component-specific constants
 DEFAULT_LAND_PORTION = 0.3 # portion of the surface that is made up of (initially) dry land
-DEFAULT_FOREST_COVERAGE = 0.3 # portion of dry land covered by forest
+DEFAULT_FOREST_COVERAGE = 0.2 # portion of dry land covered by forest
 DEFAULT_FOREST_GERMINATION = 20 # maximum number of cells from germination center for forest
 DEFAULT_INDUSTRY_GERM_LIMIT = 3
 DEFAULT_INDUSTRY_QUANTITY = 700 # number of cells on dry land to be designated as industrial tiles
@@ -560,7 +560,7 @@ class Ice:
         self.max_volume = 50 # maximum amount of ice in a cell
         initial_h = self.water.mat.shape[0] // 10 # height of the initial ice sheets, starting from the top/bottom
         initial_w = int(self.water.mat.shape[1] / 1.5) # width of the initial ice sheet
-        self.freeze_point = -5 # below this temperature (exclusive), water will turn to ice
+        self.freeze_point = -2 # below this temperature (exclusive), water will turn to ice
         self.thaw_point = 0 # above this temperature (exclusive), ice will turn to water
         # spacing out freeze and thaw points should add some stability to ice and stop it from blinking
         # add initial ice sheets at poles
