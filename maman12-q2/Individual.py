@@ -1,7 +1,6 @@
 from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
-import pandas as pd
 import copy
 
 # constants
@@ -135,3 +134,13 @@ class Individual:
         # offspring genomes are a crossover of their parents' genome
         genotype_1, genotype_2 = self.crossover(partner)
         return Individual(genotype_1), Individual(genotype_2)
+
+    def __lt__(self, other:Individual) -> bool:
+        if not isinstance(other, Individual):
+            raise NotImplemented
+        return self.fitness_score < other.fitness_score
+
+    def __eq__(self, other:Individual) -> bool:
+        if not isinstance(other, Individual):
+            return NotImplemented
+        return self.fitness_score == other.fitness_score
