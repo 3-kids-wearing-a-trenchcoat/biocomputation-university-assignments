@@ -1,7 +1,10 @@
 from __future__ import annotations
+from concurrent.futures import ThreadPoolExecutor
+import atexit
 import numpy as np
 from numpy.typing import NDArray
 import copy
+import heapq
 from tqdm import tqdm
 from Individual import Individual, FTYPE
 
@@ -11,6 +14,7 @@ DEFAULT_WIN_PROB = 0.7 # default probability of top candidate to become a parent
 DEFAULT_INIT_POP_SIGMA = 0.7 # default standard deviation for random values of initial pop (mean 0)
 DEFAULT_CANDIDATE_NUM = 3 # default number of candidates in each tournament for the purpose of procreation
 DEFAULT_CARRY_OVER_NUM = 2 # default number of the best candidates which will be carried over to the next generation
+THREADS = 4 # number of workers in ThreadPoolExecutor
 
 class Population:
     """This class represents the entire population of candidate solution.
@@ -41,6 +45,10 @@ class Population:
         self.pop = [Individual(self.rng.normal(0, init_sigma, ind_size).astype(FTYPE),False)
                     for _ in tqdm(range(pop_size), desc='Generating initial population', dynamic_ncols=True)]
 
+        # initialize ThreadPoolExecutor
+        self.executor = ThreadPoolExecutor(max_workers=THREADS)
+        atexit.register(self.executor.shutdown, wait=True)
+
     def tournament_selection(self, candidates:NDArray[Individual], exclude:Individual=None) -> Individual:
         """
         Select a winner from the given list of candidates.
@@ -65,6 +73,7 @@ class Population:
                 return candidate # if so, return it
         # Leaving the for loop can happen only if we reached the last candidate and it's excluded
         # in this case we return the second-to-last Individual
+        # At most one individual is excluded, so we can guarantee the second-to-last member isn't excluded
         return candidates[-2]
 
 
@@ -80,3 +89,49 @@ class Population:
         parent2 = self.tournament_selection(candidates, parent1) # pick second winner that is not parent1
         return parent1, parent2
 
+    def gen_children(self, children_num) -> list[Individual]:
+        """
+        Generate a number of children via tournament selection.
+        The idea is for several calls to this function to run in parallel to generate a new population
+        :param children_num: number of child Individual objects to spawn
+        :return: list of Individual objects
+        """
+        output: list[Individual] = []
+        while len(output) < children_num:
+            parents = self.tournament()
+            output += parents[0].breed(parents[1])
+        return output
+
+    def get_carry_overs(self) -> list[Individual]:
+        """
+        Get a list of the highest fitness individuals in this population, which are going to carry over
+        to the next generation.
+        :return: list of Individual objects of length self.carry_over
+        """
+        return list(heapq.nsmallest(self.carry_over, self.pop))
+
+    def __iter__(self):
+        """Population is its own iterator, returning the next generation of the population at each step"""
+        return self
+
+    def __next__(self) -> Population:
+        """Generate the next generation of the population"""
+        # TODO: implement stop conditions for maximum iterations, stagnation and sufficient fitness
+        # TODO: play around with parallelization to make sure it's beneficial and if so, find a conservative value for it
+        output = copy.copy(self) # other than pop, all other attributes are identical and can be shallow copies
+        output.pop = [] # start with an empty pop
+
+        children_per_worker_base, children_per_worker_rem = divmod(self.pop_size - self.carry_over, THREADS)
+        # number of children each worker will generate, divided as equally possible
+        child_quant = [children_per_worker_base + 1 if i < children_per_worker_rem
+                       else children_per_worker_base
+                       for i in range(THREADS)]
+        # start parallel work
+        futures = {self.executor.submit(self.gen_children, child_quant[i]) for i in range(THREADS)}
+        # update output from each worker when they're done
+        for fut in futures:
+            output.pop += fut.result()
+        # add carry-overs to next pop
+        output.pop += self.get_carry_overs()
+
+        return output
