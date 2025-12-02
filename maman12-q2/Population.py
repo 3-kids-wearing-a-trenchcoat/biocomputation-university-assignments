@@ -37,7 +37,7 @@ class Population:
         self.pop_size = pop_size # population size
         self.win_prob = win_prob # probability to win a tournament
         self.participants = tournament_participants # participants in each tournament
-        self.carry_over = carry_over # number of the best candidates to carry over to next generation
+        self.num_carry_over = carry_over # number of the best candidates to carry over to next generation
 
         # X must be of shape (t x s), where M is of size (g x s) and H is of size (g x t)
         ind_size = (Individual.H.shape[1], Individual.M.shape[1]) # shape of candidate solution
@@ -48,6 +48,12 @@ class Population:
         # initialize ThreadPoolExecutor
         self.executor = ThreadPoolExecutor(max_workers=THREADS)
         atexit.register(self.executor.shutdown, wait=True)
+
+        # stored carry-overs - We look for the n best Individuals twice an iteration, when finding carry-overs
+        # and when finding the best current solution.
+        # when either one is called we will simply find the carry-overs and store the results for when the other one
+        # needs them, instead of running that search twice
+        self.carry_over = None
 
     def tournament_selection(self, candidates:NDArray[Individual], exclude:Individual=None) -> Individual:
         """
@@ -106,9 +112,17 @@ class Population:
         """
         Get a list of the highest fitness individuals in this population, which are going to carry over
         to the next generation.
-        :return: list of Individual objects of length self.carry_over
+        :return: list of Individual objects of length self.num_carry_over
         """
-        return list(heapq.nsmallest(self.carry_over, self.pop))
+        if self.carry_over is None:
+            self.carry_over = list(heapq.nsmallest(self.num_carry_over, self.pop))
+        return self.carry_over
+
+    def get_best(self) -> Individual:
+        """Get the Individual with the best fitness score in the population"""
+        if self.carry_over is None:
+            self.carry_over = list(heapq.nsmallest(self.num_carry_over, self.pop))
+        return self.carry_over[0]
 
     def __iter__(self):
         """Population is its own iterator, returning the next generation of the population at each step"""
@@ -120,8 +134,9 @@ class Population:
         # TODO: play around with parallelization to make sure it's beneficial and if so, find a conservative value for it
         output = copy.copy(self) # other than pop, all other attributes are identical and can be shallow copies
         output.pop = [] # start with an empty pop
+        output.carry_over = [] # carry_over also needs to be reset as the old values aren't relevant
 
-        children_per_worker_base, children_per_worker_rem = divmod(self.pop_size - self.carry_over, THREADS)
+        children_per_worker_base, children_per_worker_rem = divmod(self.pop_size - self.num_carry_over, THREADS)
         # number of children each worker will generate, divided as equally possible
         child_quant = [children_per_worker_base + 1 if i < children_per_worker_rem
                        else children_per_worker_base
