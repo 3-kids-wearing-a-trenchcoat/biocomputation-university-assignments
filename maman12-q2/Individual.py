@@ -11,12 +11,12 @@ class Individual:
     Each Individual is made up of a genotype, phenotype and fitness score.
     A pair of Individuals can breed, producing """
     # static variables
-    _rng: np.random.Generator = None # random number generator
+    rng: np.random.Generator = None # random number generator
     _mut_prob: float = None # mutation probability, between 0 and 1
     _mut_standard_deviation: float = None # standard deviation of random values we add to mimic mutation (sigma)
     _crossover_prob: float = None # probability of children being produced by crossover rather than cloning
-    _M: NDArray[FTYPE] = None # number of sequences for gene i in sample j
-    _H: NDArray[FTYPE] = None # number of sequences for gene i in cell-type j
+    M: NDArray[FTYPE] = None # number of sequences for gene i in sample j
+    H: NDArray[FTYPE] = None # number of sequences for gene i in cell-type j
 
     @staticmethod
     def set_static_vars(rng:np.random.Generator, mut_prob:float, mut_standard_deviation:float, crossover_prob:float,
@@ -30,12 +30,12 @@ class Individual:
         :param M: Matrix where the cell at index (i,j) represents the number of sequences for gene i in sample j
         :param H: Matrix where the cell at index (i,j) represents the number of sequences for gene i in cell type j
         """
-        Individual._rng = rng
+        Individual.rng = rng
         Individual._mut_prob = mut_prob
         Individual._mut_standard_deviation = mut_standard_deviation
         Individual._crossover_prob = crossover_prob
-        Individual._M = M
-        Individual._H = H
+        Individual.M = M
+        Individual.H = H
 
     @staticmethod
     def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]:
@@ -46,12 +46,12 @@ class Individual:
         # "roll the dice" for every value in genotype, any value above _mut_prob will mutate
         # The choice of which cells to mutate is uniformly distributed, i.e. every cell has the same chance of mutating
         # that is independent of whether other cells mutated
-        mut_dice_roll = Individual._rng.uniform(0, 1, genotype.size)
+        mut_dice_roll = Individual.rng.uniform(0, 1, genotype.size)
         mut_mask = np.where(mut_dice_roll > Individual._mut_prob, True, False).astype(np.bool)
         # apply mutation in cells that have been chosen for mutation
         # each cell's mutation is random and normally distributed
         mutation = np.zeros_like(genotype)
-        mutation[mut_mask] = Individual._rng.normal(0, Individual._mut_standard_deviation, mutation[mut_mask].shape)
+        mutation[mut_mask] = Individual.rng.normal(0, Individual._mut_standard_deviation, mutation[mut_mask].shape)
         # add mutation to genotype and return
         return genotype + mutation
 
@@ -70,7 +70,7 @@ class Individual:
         **M** - number of sequences for gene i in sample j
         **H** - number of sequences for gene i in cell type j
         **X** - Individual phenotype, the candidate solution"""
-        return np.square(np.linalg.norm(Individual._M - Individual._H.dot(self.phenotype)))
+        return np.square(np.linalg.norm(Individual.M - Individual.H.dot(self.phenotype)))
 
     def __init__(self, genotype: NDArray[FTYPE], mutate:bool = True):
         """
@@ -107,7 +107,7 @@ class Individual:
         :return: two new genotypes (2D float matrices)
         """
         # generate two arithmetically symmetrical blending rate matrices (alpha) randomly in uniform distribution
-        alpha_1 = Individual._rng.uniform(0, 1, self.genotype.shape)
+        alpha_1 = Individual.rng.uniform(0, 1, self.genotype.shape)
         alpha_2 = np.ones_like(alpha_1) - alpha_1
         # generate child genotypes via intermediate recombination
         child_1 = self.genotype + alpha_1 * (partner.genotype - self.genotype)
@@ -127,7 +127,7 @@ class Individual:
         :return: tuple of two new Individuals
         """
         # offsprings will be produced by crossover with a probability of _crossover_prob
-        crossover:bool = (Individual._rng.uniform() <= Individual._crossover_prob)
+        crossover:bool = (Individual.rng.uniform() <= Individual._crossover_prob)
         if not crossover:
             # Each offspring's genome is a mutated clone of a parents' genome
             return Individual(self.genotype.copy()), Individual(partner.genotype.copy())
