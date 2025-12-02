@@ -5,7 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 import copy
 import heapq
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from Individual import Individual, FTYPE
 
 # constants
@@ -43,7 +43,7 @@ class Population:
         ind_size = (Individual.H.shape[1], Individual.M.shape[1]) # shape of candidate solution
         # the "bucket" of Individual objects that make up the population, generated randomly via normal distribution
         self.pop = [Individual(self.rng.normal(0, init_sigma, ind_size).astype(FTYPE),False)
-                    for _ in tqdm(range(pop_size), desc='Generating initial population', dynamic_ncols=True)]
+                    for _ in trange(pop_size, desc='Generating initial population', dynamic_ncols=True)]
 
         # initialize ThreadPoolExecutor
         self.executor = ThreadPoolExecutor(max_workers=THREADS)
