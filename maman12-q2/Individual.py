@@ -140,6 +140,11 @@ class Individual:
             raise NotImplemented
         return self.fitness_score < other.fitness_score
 
+    def __gt__(self, other:Individual) -> bool:
+        if not isinstance(other, Individual):
+            raise NotImplemented
+        return self.fitness_score < other.fitness_score
+
     def __eq__(self, other:Individual) -> bool:
         if not isinstance(other, Individual):
             return NotImplemented
