@@ -5,7 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 import copy
 import heapq
-from tqdm import tqdm, trange
+from tqdm import trange
 from Individual import Individual, FTYPE
 
 # constants
@@ -147,6 +147,13 @@ class Population:
         if self.carry_over is None:
             self.carry_over = list(heapq.nsmallest(self.num_carry_over, self.pop))
         return self.carry_over[0]
+
+    def get_worst(self) -> Individual:
+        """Get the Individual with the worst fitness score in the population"""
+        return max(self.pop)
+
+    def get_pocket_score(self) -> float:
+        return self.pocket.fitness_score
 
     def __iter__(self):
         """Population is its own iterator, returning the next generation of the population at each step"""
