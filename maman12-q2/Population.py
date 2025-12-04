@@ -1,8 +1,6 @@
 from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 import atexit
-from heapq import heapify
-
 import numpy as np
 from numpy.typing import NDArray
 import copy
