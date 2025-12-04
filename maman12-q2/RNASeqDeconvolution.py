@@ -9,18 +9,15 @@ class RNASeqDeconvolution:
     """This class runs the RNA-seq deconvolution genetic algorithm and produces and stores the associated results.
     In addition to the actual matrix representing the percent of cell types for a sample, these results include:
     * History of the best fitness score per iteration
-    * History of the worst fitness score per iteration
-    * Confusion matrix compared to the true result (as supplied by input)"""
-    def __init__(self, pop:Population, true_result:NDArray[FTYPE]):
+    * History of the worst fitness score per iteration"""
+    def __init__(self, pop:Population):
         """
         Initialize an RNA-sequence deconvolution run
         :param pop: Initialized Population object
-        :param true_result: Matrix representing true result, against which the algorithm's result is compared
         """
         self.best_history = [] # history of best fitness value per iteration
         self.worst_history = [] # history of worst fitness value per iteration
         self.pop = pop # Population object that implements the actual algorithm using Individual
-        self.true_result = true_result # the True result against which this result will be compared
         self.result: NDArray[FTYPE]|None = None # result at the end of the run (phenotype of pocket Individual)
         self.result_fitness_score: float|None = None
         self.confusion_matrix: NDArray[FTYPE]|None = None # confusion matrix of the result compared to true result
