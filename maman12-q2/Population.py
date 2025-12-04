@@ -1,10 +1,12 @@
 from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 import atexit
+from heapq import heapify
+
 import numpy as np
 from numpy.typing import NDArray
 import copy
-import heapq
+from HeapqIndividual import HeapqIndividual as hqi
 from tqdm import trange
 from Individual import Individual, FTYPE
 
@@ -73,11 +75,13 @@ class Population:
         # and when finding the best current solution.
         # when either one is called we will simply find the carry-overs and store the results for when the other one
         # needs them, instead of running that search twice
-        self.carry_over = None
+        self.carry_over: list[Individual]|None = None
         # pocket Individual - the best Individual encountered so far in all iterations that have come so far
         # it is replaced by the current iteration's best whenever its fitness value is better than the current pocket
         # (I already examine the best current Individual every iteration, so this is not noticeably more expensive)
         self.pocket: Individual|None = None
+        # worst fitness score in this population
+        self.worst_fitness_score = 0
 
     def tournament_selection(self, candidates:NDArray[Individual], exclude:Individual=None) -> Individual:
         """
@@ -106,7 +110,6 @@ class Population:
         # At most one individual is excluded, so we can guarantee the second-to-last member isn't excluded
         return candidates[-2]
 
-
     def tournament(self) -> tuple[Individual, Individual]:
         """
         Get a pair of parents selected via the tournament method
@@ -119,41 +122,40 @@ class Population:
         parent2 = self.tournament_selection(candidates, parent1) # pick second winner that is not parent1
         return parent1, parent2
 
-    def gen_children(self, children_num) -> list[Individual]:
+    def gen_children(self, children_num) -> tuple[list[Individual], hqi, float]:
         """
-        Generate a number of children via tournament selection.
-        The idea is for several calls to this function to run in parallel to generate a new population
+        Generate a number of children via tournament selection and record a list of the children with the best fitness
+        as well as the worst fitness score encountered
         :param children_num: number of child Individual objects to spawn
-        :return: list of Individual objects
+        :return: a tuple of the following elements in order:
+                 * list of generated children
+                 * HeapqIndividual of size self.num_carry_over containing the best elements encountered thus far
+                 * float equal to the worst (highest) fitness score encountered
         """
-        output: list[Individual] = []
+        output: list[Individual] = [] # list of all generated children
+        k_best: hqi = hqi(self.num_carry_over) # sorted list of the best fitness children, from worst to best
+        worst_score: float = 0 # worst fitness score encountered
+
         while len(output) < children_num:
-            parents = self.tournament()
-            output += parents[0].breed(parents[1])
-        return output
+            parents = self.tournament() # choose parents
+            children = parents[0].breed(parents[1]) # spawn children of chosen parents
+            output += children # add children to next generation
+            # if either child is better than the worst in k_best, remove the worst scorer and add the child
+            k_best.push(children[0])
+            k_best.push(children[1])
+            # check if either child has a fitness score worse than the worst recorded
+            if worst_score < children[0].fitness_score:
+                worst_score = children[0].fitness_score
+            if worst_score < children[1].fitness_score:
+                worst_score = children[1].fitness_score
 
-    def get_carry_overs(self) -> list[Individual]:
-        """
-        Get a list of the highest fitness individuals in this population, which are going to carry over
-        to the next generation.
-        :return: list of Individual objects of length self.num_carry_over
-        """
-        if self.carry_over is None:
-            self.carry_over = list(heapq.nsmallest(self.num_carry_over, self.pop))
-        return self.carry_over
+        return output, k_best, worst_score
 
-    def get_best(self) -> Individual:
-        """Get the Individual with the best fitness score in the population"""
-        if self.carry_over is None:
-            self.carry_over = list(heapq.nsmallest(self.num_carry_over, self.pop))
-        return self.carry_over[0]
+    def best_score(self) -> float:
+        return self.carry_over[-1].fitness_score
 
-    def get_worst(self) -> Individual:
-        """Get the Individual with the worst fitness score in the population"""
-        return max(self.pop)
-
-    def get_pocket_score(self) -> float:
-        return self.pocket.fitness_score
+    def get_pocket(self) -> Individual:
+        return self.pocket
 
     def __iter__(self):
         """Population is its own iterator, returning the next generation of the population at each step"""
@@ -163,15 +165,15 @@ class Population:
         """Generate the next generation of the population"""
         # stop if any of the stop conditions are met
         if (self.current_iter >= self.max_iter or  # max iterations reached
-            (self.pocket is not None and self.pocket.get_fitness_score() <= self.satisfactory) or # satisfactory score
+            (self.pocket is not None and self.pocket.fitness_score <= self.satisfactory) or # satisfactory score
             self.current_stagnant_iter >= self.stagnation_limit): # reached stagnant iteration limit
             raise StopIteration
         # TODO: play around with parallelization to make sure it's beneficial and if so, find a conservative value for it
-
         # initialize next generation
         output = copy.copy(self) # other than pop, all other attributes are identical and can be shallow copies
         output.pop = [] # start with an empty pop
         output.carry_over = [] # carry_over also needs to be reset as the old values aren't relevant
+        output.worst_fitness_score = 0 # this variable refers only to this population's scores
 
         # generate individuals in the next generation
         children_per_worker_base, children_per_worker_rem = divmod(self.pop_size - self.num_carry_over, THREADS)
@@ -181,19 +183,26 @@ class Population:
                        for i in range(THREADS)]
         # start parallel work
         futures = {self.executor.submit(self.gen_children, child_quant[i]) for i in range(THREADS)}
+
         # update output from each worker when they're done
+        total_k_best = hqi(self.num_carry_over)
         for fut in futures:
-            output.pop += fut.result()
-        # add carry-overs to next pop
-        carry_overs = self.get_carry_overs()
-        output.pop += carry_overs
+            fut_results = fut.results()
+            output.pop += fut_results[0] # generated children added to pop
+            total_k_best.merge(fut_results[1]) # merge k_best heaps
+            if fut_results[2] > output.worst_fitness_score: # update worst score found
+                output.worst_fitness_score = fut_results[2]
+        # transform total_k_best into a sorted list and store it as output's carry-overs
+        output.carry_over = total_k_best.list()
+        # add carry-overs (the best individuals this iteration) to next generation's pop
+        output.pop += self.carry_over
 
         # update stop-condition-related variables in output
         output.current_iter += 1 # increase iteration counter
-        pocket_candidate = output.get_best() # get the best fitness Individual in the new generation
+        pocket_candidate = output.carry_over[-1] # get the best fitness Individual in the new generation
         # check if the next generation is stagnant by checking if the diff of the best fitness scores is less
         # than or equal to the defined stagnation_diff
-        if np.absolute(carry_overs[0].fitness_score - pocket_candidate.fitness_score) <= self.stagnation_diff:
+        if np.absolute(self.carry_over[-1].fitness_score - pocket_candidate.fitness_score) <= self.stagnation_diff:
             output.current_stagnant_iter += 1 # if so, increase stagnation counter by 1
         else:
             output.current_stagnant_iter = 0 # otherwise, this generation is not stagnant and the counter is zeroed
