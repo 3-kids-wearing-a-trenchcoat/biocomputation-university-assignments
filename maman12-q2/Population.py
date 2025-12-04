@@ -185,7 +185,7 @@ class Population:
         # update output from each worker when they're done
         total_k_best = hqi(self.num_carry_over)
         for fut in futures:
-            fut_results = fut.results()
+            fut_results = fut.result()
             output.pop += fut_results[0] # generated children added to pop
             total_k_best.merge(fut_results[1]) # merge k_best heaps
             if fut_results[2] > output.worst_fitness_score: # update worst score found
