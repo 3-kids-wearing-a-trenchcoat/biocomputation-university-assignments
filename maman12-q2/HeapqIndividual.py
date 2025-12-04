@@ -17,8 +17,10 @@ class HeapqIndividual:
         If the push makes this heap exceed its max_size, it will instead REPLACE the lowest-fitness element"""
         new_element = (ind.fitness_score * -1, ind)
         if self.length == self.max_size - 1: # if this heap is full
-            if new_element < self.data[0]: # if more fit than the least fit Individual in data
+            if new_element > self.data[0]: # if more fit than the least fit Individual in data
+                # we aspire for the closest score to 0, and we negated the fitness scores, so in this case higher is better
                 heapq.heapreplace(self.data, new_element)
+            # if new_element's score isn't better than that of the worst scorer in the list, discard the new value
         heapq.heappush(new_element)
 
     def merge(self, other: HeapqIndividual) -> HeapqIndividual:
