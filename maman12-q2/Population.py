@@ -5,7 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 import copy
 from HeapqIndividual import HeapqIndividual as hqi
-from tqdm import trange
+from tqdm.auto import trange
 from Individual import Individual, FTYPE
 
 # constants
