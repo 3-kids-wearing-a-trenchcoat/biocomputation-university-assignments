@@ -23,9 +23,11 @@ class RNASeqDeconvolution:
         self.confusion_matrix: NDArray[FTYPE]|None = None # confusion matrix of the result compared to true result
         self.stop_reason: str = ""
 
-    def detect_stop_reason(self, generation:Population) -> str:
+    def detect_stop_reason(self, generation:Population = None) -> str:
         if self.stop_reason != "":
             return self.stop_reason
+        if generation is None:
+            generation = self.pop
         if generation.current_iter >= generation.max_iter:
             self.stop_reason = "iteration limit"
         elif generation.current_stagnant_iter >= generation.stagnation_limit:
@@ -34,10 +36,11 @@ class RNASeqDeconvolution:
             self.stop_reason = "satisfactory fitness score"
         return self.stop_reason
 
-    def run(self, print_stop_reason:bool=False) -> None:
+    def run(self, tqdm_leave:bool=True, tqdm_pos:int=0, print_stop_reason:bool=False) -> None:
         """Run the RNA-seq deconvolution algorithm on the given population.
         This function doesn't return anything and its results need to be extracted with the getter methods"""
-        pbar = tqdm(self.pop, total=self.pop.max_iter, desc="running RNA-seq deconvolution", dynamic_ncols=True)
+        pbar = tqdm(self.pop, total=self.pop.max_iter, desc="running RNA-seq deconvolution",
+                    dynamic_ncols=True, leave=tqdm_leave, position=tqdm_pos)
         for generation in pbar:
             self.best_history.append(generation.best_score())
             self.worst_history.append(generation.worst_fitness_score)
@@ -45,6 +48,7 @@ class RNASeqDeconvolution:
             pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
                                  f"worst score: {self.worst_history[-1]:.4f}, pocket score: {pocket_score:.4f}, "
                                  f"stagnant iterations: {generation.current_stagnant_iter}")
+        self.pop = generation
         if print_stop_reason:
             print(self.detect_stop_reason(generation))
         self.result = generation.get_pocket().get_phenotype()

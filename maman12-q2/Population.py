@@ -63,7 +63,9 @@ class Population:
         ind_size = (Individual.H.shape[1], Individual.M.shape[1]) # shape of candidate solution
         # the "bucket" of Individual objects that make up the population, generated randomly via normal distribution
         self.pop = [Individual(self.rng.normal(0, init_sigma, ind_size).astype(FTYPE),False)
-                    for _ in trange(pop_size, desc='Generating initial population', dynamic_ncols=True)]
+                    for _ in range(pop_size)]
+        # self.pop = [Individual(self.rng.normal(0, init_sigma, ind_size).astype(FTYPE),False)
+        #             for _ in trange(pop_size, desc='Generating initial population', dynamic_ncols=True)]
 
         # initialize ThreadPoolExecutor
         self.executor = ThreadPoolExecutor(max_workers=THREADS)
