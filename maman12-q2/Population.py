@@ -14,10 +14,10 @@ DEFAULT_WIN_PROB = 0.7 # default probability of top candidate to become a parent
 DEFAULT_INIT_POP_SIGMA = 0.7 # default standard deviation for random values of initial pop (mean 0)
 DEFAULT_CANDIDATE_NUM = 3 # default number of candidates in each tournament for the purpose of procreation
 DEFAULT_CARRY_OVER_NUM = 2 # default number of the best candidates which will be carried over to the next generation
-THREADS = 4 # number of workers in ThreadPoolExecutor
-DEFAULT_MAX_ITER = 10000 # default number of iterations at which we stop regardless of other stop conditions
+THREADS = 1 # number of workers in ThreadPoolExecutor
+DEFAULT_MAX_ITER = 1000 # default number of iterations at which we stop regardless of other stop conditions
 DEFAULT_SATISFACTORY = 1e-3 # default satisfactory fitness value, if an individual is less-than-or-equal to it, stop.
-DEFAULT_STAGNATION_LIMIT = 200 # default number of iterations at which, if no significant improvement was found, stop.
+DEFAULT_STAGNATION_LIMIT = 100 # default number of iterations at which, if no significant improvement was found, stop.
 DEFAULT_STAGNATION_DIFF = 1e-3 # default value of difference between iteration best-fitness-score at which we consider
                                # this generation to be "stagnant" (negligible improvement)
 
@@ -149,7 +149,9 @@ class Population:
         return output, k_best, worst_score
 
     def get_best(self) -> Individual:
-        return self.carry_over.get(-1)
+        # return self.carry_over.get(-1)
+        output = self.carry_over.get(-1)
+        return output
 
     def best_score(self) -> float:
         return self.carry_over.get(-1).fitness_score
@@ -157,9 +159,9 @@ class Population:
     def get_pocket(self) -> Individual:
         return self.pocket
 
-    def __iter__(self):
-        """Population is its own iterator, returning the next generation of the population at each step"""
-        return self
+    def __iter__(self) -> PopIterator:
+        # return self
+        return PopIterator(self)
 
     def __next__(self) -> Population:
         """Generate the next generation of the population"""
@@ -212,3 +214,16 @@ class Population:
             output.pocket = pocket_candidate # make it the new pocket Individual
 
         return output
+
+
+class PopIterator:
+    """Iterator object for population, each iteration step is the next population generation"""
+    def __init__(self, pop:Population):
+        self.pop = pop
+
+    def __next__(self) -> Population:
+        try:
+            self.pop = next(self.pop)
+        except StopIteration:
+            raise StopIteration
+        return self.pop
