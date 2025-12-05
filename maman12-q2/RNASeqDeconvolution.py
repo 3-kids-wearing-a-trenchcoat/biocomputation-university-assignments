@@ -42,7 +42,7 @@ class RNASeqDeconvolution:
             self.worst_history.append(generation.worst_fitness_score)
             pocket_score = generation.pocket.fitness_score
             pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
-                                 f"worst_score: {self.worst_history[-1]:.4f}, pocket score: {pocket_score}:.4f")
+                                 f"worst_score: {self.worst_history[-1]:.4f}, pocket score: {pocket_score:.4f}")
         self.print_stop_reason(generation)
         self.result = generation.get_pocket().get_phenotype()
         self.result_fitness_score = generation.result.get_fitness_score()
