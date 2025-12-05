@@ -46,8 +46,8 @@ class Individual:
         # "roll the dice" for every value in genotype, any value above _mut_prob will mutate
         # The choice of which cells to mutate is uniformly distributed, i.e. every cell has the same chance of mutating
         # that is independent of whether other cells mutated
-        mut_dice_roll = Individual.rng.uniform(0, 1, genotype.size)
-        mut_mask = np.where(mut_dice_roll > Individual._mut_prob, True, False).astype(np.bool)
+        mut_dice_roll = Individual.rng.uniform(0, 1, genotype.shape)
+        mut_mask = np.where(mut_dice_roll < Individual._mut_prob, True, False).astype(np.bool)
         # apply mutation in cells that have been chosen for mutation
         # each cell's mutation is random and normally distributed
         mutation = np.zeros_like(genotype)
@@ -135,17 +135,23 @@ class Individual:
         genotype_1, genotype_2 = self.crossover(partner)
         return Individual(genotype_1), Individual(genotype_2)
 
-    def __lt__(self, other:Individual) -> bool:
+    def __lt__(self, other:Individual|None) -> bool:
+        if other is None:
+            return True
         if not isinstance(other, Individual):
             raise NotImplemented
         return self.fitness_score < other.fitness_score
 
-    def __gt__(self, other:Individual) -> bool:
+    def __gt__(self, other:Individual|None) -> bool:
+        if other is None:
+            return False
         if not isinstance(other, Individual):
             raise NotImplemented
         return self.fitness_score < other.fitness_score
 
-    def __eq__(self, other:Individual) -> bool:
+    def __eq__(self, other:Individual|None) -> bool:
+        if other is None:
+            return False
         if not isinstance(other, Individual):
             return NotImplemented
         return self.fitness_score == other.fitness_score
