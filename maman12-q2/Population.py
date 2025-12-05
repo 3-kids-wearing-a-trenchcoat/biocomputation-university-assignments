@@ -69,11 +69,10 @@ class Population:
         self.executor = ThreadPoolExecutor(max_workers=THREADS)
         atexit.register(self.executor.shutdown, wait=True)
 
-        # stored carry-overs - We look for the n best Individuals twice an iteration, when finding carry-overs
-        # and when finding the best current solution.
-        # when either one is called we will simply find the carry-overs and store the results for when the other one
-        # needs them, instead of running that search twice
-        self.carry_over: list[Individual]|None = None
+        # The best individuals in this pop which will be carried over to the next generation
+        # self.carry_over: list[Individual]|None = None
+        self.carry_over: hqi = hqi(self.num_carry_over)
+        [self.carry_over.push(ind) for ind in self.pop]
         # pocket Individual - the best Individual encountered so far in all iterations that have come so far
         # it is replaced by the current iteration's best whenever its fitness value is better than the current pocket
         # (I already examine the best current Individual every iteration, so this is not noticeably more expensive)
@@ -149,8 +148,11 @@ class Population:
 
         return output, k_best, worst_score
 
+    def get_best(self) -> Individual:
+        return self.carry_over.get(-1)
+
     def best_score(self) -> float:
-        return self.carry_over[-1].fitness_score
+        return self.carry_over.get(-1).fitness_score
 
     def get_pocket(self) -> Individual:
         return self.pocket
@@ -170,7 +172,7 @@ class Population:
         # initialize next generation
         output = copy.copy(self) # other than pop, all other attributes are identical and can be shallow copies
         output.pop = [] # start with an empty pop
-        output.carry_over = [] # carry_over also needs to be reset as the old values aren't relevant
+        output.carry_over = hqi(self.num_carry_over) # carry_over also reset as the old values aren't relevant
         output.worst_fitness_score = 0 # this variable refers only to this population's scores
 
         # generate individuals in the next generation
@@ -181,26 +183,27 @@ class Population:
                        for i in range(THREADS)]
         # start parallel work
         futures = {self.executor.submit(self.gen_children, child_quant[i]) for i in range(THREADS)}
-
         # update output from each worker when they're done
-        total_k_best = hqi(self.num_carry_over)
         for fut in futures:
             fut_results = fut.result()
             output.pop += fut_results[0] # generated children added to pop
-            total_k_best.merge(fut_results[1]) # merge k_best heaps
+            output.carry_over = output.carry_over.merge(fut_results[1]) # merge k_best heaps
             if fut_results[2] > output.worst_fitness_score: # update worst score found
                 output.worst_fitness_score = fut_results[2]
-        # transform total_k_best into a sorted list and store it as output's carry-overs
-        output.carry_over = total_k_best.list()
-        # add carry-overs (the best individuals this iteration) to next generation's pop
-        output.pop += self.carry_over
+
+        # add carry-overs from this generation to the next
+        output.pop += self.carry_over.list()
+        output.carry_over = output.carry_over.merge(self.carry_over)
+        worst_self_carry_over = self.carry_over.get(0).fitness_score # worst fitness of the Individuals carried over from this generation
+        if worst_self_carry_over > output.worst_fitness_score:
+            output.worst_fitness_score = worst_self_carry_over
 
         # update stop-condition-related variables in output
         output.current_iter += 1 # increase iteration counter
-        pocket_candidate = output.carry_over[-1] # get the best fitness Individual in the new generation
+        pocket_candidate = output.get_best() # get the best fitness Individual in the new generation
         # check if the next generation is stagnant by checking if the diff of the best fitness scores is less
         # than or equal to the defined stagnation_diff
-        if np.absolute(self.carry_over[-1].fitness_score - pocket_candidate.fitness_score) <= self.stagnation_diff:
+        if np.absolute(self.best_score() - pocket_candidate.fitness_score) <= self.stagnation_diff:
             output.current_stagnant_iter += 1 # if so, increase stagnation counter by 1
         else:
             output.current_stagnant_iter = 0 # otherwise, this generation is not stagnant and the counter is zeroed
