@@ -70,7 +70,8 @@ class Individual:
         **M** - number of sequences for gene i in sample j
         **H** - number of sequences for gene i in cell type j
         **X** - Individual phenotype, the candidate solution"""
-        return np.square(np.linalg.norm(Individual.M - Individual.H.dot(self.phenotype)))
+        # return np.square(np.linalg.norm(Individual.M - Individual.H.dot(self.phenotype)))
+        return np.linalg.norm(Individual.M - Individual.H.dot(self.phenotype))
 
     def __init__(self, genotype: NDArray[FTYPE], mutate:bool = True):
         """
