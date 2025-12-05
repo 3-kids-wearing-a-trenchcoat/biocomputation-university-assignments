@@ -41,6 +41,11 @@ def parse_input_matrix(path:Path, t:DTypeLike = FTYPE) -> NDArray:
     output = df.apply(pd.to_numeric, errors="coerce").to_numpy(dtype=t)
     return output
 
+# adding values to DEFAULT_PARAMS here because I need parse_input_matrix
+M = parse_input_matrix(DEFAULT_PARAMS.get("M_path"))
+H = parse_input_matrix(DEFAULT_PARAMS.get("H_path"))
+DEFAULT_PARAMS["M"], DEFAULT_PARAMS["H"] = M, H
+
 def set_parameters(input_params:dict[str, float|int|NDArray[FTYPE]|np.random.Generator]) -> RNASeqDeconvolution:
     """
     Helper function which initializes the **many** variables across Population and Individual.
@@ -143,9 +148,7 @@ def compare(var1:str, start1:float, step1:float, end1:float,
 
 
 if __name__ == "__main__":
-    M = parse_input_matrix(DEFAULT_PARAMS.get("M_path"))
-    H = parse_input_matrix(DEFAULT_PARAMS.get("H_path"))
-    DEFAULT_PARAMS["M"], DEFAULT_PARAMS["H"] = M, H
+
     # params = {"M": M, "H": H}
     # experiment = set_parameters(params)
     # experiment.run()
