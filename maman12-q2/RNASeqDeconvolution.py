@@ -21,19 +21,20 @@ class RNASeqDeconvolution:
         self.result: NDArray[FTYPE]|None = None # result at the end of the run (phenotype of pocket Individual)
         self.result_fitness_score: float|None = None
         self.confusion_matrix: NDArray[FTYPE]|None = None # confusion matrix of the result compared to true result
+        self.stop_reason: str = ""
 
-    @staticmethod
-    def print_stop_reason(generation:Population) -> None:
-        output = "Stopped: reached "
+    def detect_stop_reason(self, generation:Population) -> str:
+        if self.stop_reason != "":
+            return self.stop_reason
         if generation.current_iter >= generation.max_iter:
-            output += "iteration limit"
+            self.stop_reason = "iteration limit"
         elif generation.current_stagnant_iter >= generation.stagnation_limit:
-            output += str(generation.stagnation_limit) + " consecutive stagnant iterations"
+            self.stop_reason = str(generation.stagnation_limit) + "consecutive stagnant iterations"
         else:
-            output += "satisfactory fitness score"
-        print(output)
+            self.stop_reason = "satisfactory fitness score"
+        return self.stop_reason
 
-    def run(self) -> None:
+    def run(self, print_stop_reason:bool=False) -> None:
         """Run the RNA-seq deconvolution algorithm on the given population.
         This function doesn't return anything and its results need to be extracted with the getter methods"""
         pbar = tqdm(self.pop, total=self.pop.max_iter, desc="running RNA-seq deconvolution", dynamic_ncols=True)
@@ -42,8 +43,10 @@ class RNASeqDeconvolution:
             self.worst_history.append(generation.worst_fitness_score)
             pocket_score = generation.pocket.fitness_score
             pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
-                                 f"worst_score: {self.worst_history[-1]:.4f}, pocket score: {pocket_score:.4f}")
-        self.print_stop_reason(generation)
+                                 f"worst score: {self.worst_history[-1]:.4f}, pocket score: {pocket_score:.4f}, "
+                                 f"stagnant iterations: {generation.current_stagnant_iter}")
+        if print_stop_reason:
+            print(self.detect_stop_reason(generation))
         self.result = generation.get_pocket().get_phenotype()
         self.result_fitness_score = generation.get_pocket().get_fitness_score()
 
