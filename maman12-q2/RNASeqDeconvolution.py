@@ -45,5 +45,5 @@ class RNASeqDeconvolution:
                                  f"worst_score: {self.worst_history[-1]:.4f}, pocket score: {pocket_score:.4f}")
         self.print_stop_reason(generation)
         self.result = generation.get_pocket().get_phenotype()
-        self.result_fitness_score = generation.result.get_fitness_score()
+        self.result_fitness_score = generation.get_pocket().get_fitness_score()
 
