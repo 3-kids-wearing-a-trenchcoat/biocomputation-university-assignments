@@ -21,7 +21,7 @@ class HeapqIndividual:
                 # we aspire for the closest score to 0, and we negated the fitness scores, so in this case higher is better
                 heapq.heapreplace(self.data, new_element)
             # if new_element's score isn't better than that of the worst scorer in the list, discard the new value
-        heapq.heappush(new_element)
+        heapq.heappush(self.data, new_element)
 
     def merge(self, other: HeapqIndividual) -> HeapqIndividual:
         """merge two HeapqIndividual objects into one.
@@ -39,4 +39,22 @@ class HeapqIndividual:
     def get(self, index:int):
         if index >= self.max_size or index < (self.max_size * -1):
             raise IndexError("index" + str(index) + " out of bounds for HeapqIndividual of size " + str(self.max_size))
-        return self.data[index]
+        return self.data[index][1]
+
+    def __iter__(self) -> HeapqIndividualIterator:
+        """Iterate over Individuals stores in this heap"""
+        return HeapqIndividualIterator(self)
+
+
+class HeapqIndividualIterator:
+    """HeapqIndividual Iterator class.
+    Iterates over the Individuals stored in order of fitness"""
+    def __init__(self, hqi:HeapqIndividual):
+        self.hqi:HeapqIndividual = hqi
+        self.i = 0
+
+    def __next__(self) -> Individual:
+        if self.i == self.hqi.max_size:
+            raise StopIteration
+        self.i += 1
+        return self.hqi.data[self.i - 1][1]
