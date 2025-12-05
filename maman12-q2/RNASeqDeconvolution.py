@@ -44,13 +44,15 @@ class RNASeqDeconvolution:
         for generation in pbar:
             self.best_history.append(generation.best_score())
             self.worst_history.append(generation.worst_fitness_score)
-            pocket_score = generation.pocket.fitness_score
+            # pocket_score = generation.pocket.fitness_score
             pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
-                                 f"worst score: {self.worst_history[-1]:.4f}, pocket score: {pocket_score:.4f}, "
+                                 f"worst score: {self.worst_history[-1]:.4f}, "
                                  f"stagnant iterations: {generation.current_stagnant_iter}")
         self.pop = generation
         if print_stop_reason:
             print(self.detect_stop_reason(generation))
-        self.result = generation.get_pocket().get_phenotype()
-        self.result_fitness_score = generation.get_pocket().get_fitness_score()
+        # self.result = generation.get_pocket().get_phenotype()
+        # self.result_fitness_score = generation.get_pocket().get_fitness_score()
+        self.result = generation.get_best().get_phenotype()
+        self.result_fitness_score = generation.best_score()
 

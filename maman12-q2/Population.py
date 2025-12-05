@@ -78,7 +78,7 @@ class Population:
         # pocket Individual - the best Individual encountered so far in all iterations that have come so far
         # it is replaced by the current iteration's best whenever its fitness value is better than the current pocket
         # (I already examine the best current Individual every iteration, so this is not noticeably more expensive)
-        self.pocket: Individual|None = None
+        # self.pocket: Individual|None = None
         # worst fitness score in this population
         self.worst_fitness_score = 0
 
@@ -158,8 +158,8 @@ class Population:
     def best_score(self) -> float:
         return self.carry_over.get(-1).fitness_score
 
-    def get_pocket(self) -> Individual:
-        return self.pocket
+    # def get_pocket(self) -> Individual:
+    #     return self.pocket
 
     def __iter__(self) -> PopIterator:
         # return self
@@ -169,7 +169,7 @@ class Population:
         """Generate the next generation of the population"""
         # stop if any of the stop conditions are met
         if (self.current_iter >= self.max_iter or  # max iterations reached
-            (self.pocket is not None and self.pocket.fitness_score <= self.satisfactory) or # satisfactory score
+            (self.best_score() <= self.satisfactory) or # satisfactory score
             self.current_stagnant_iter >= self.stagnation_limit): # reached stagnant iteration limit
             raise StopIteration
         # TODO: play around with parallelization to make sure it's beneficial and if so, find a conservative value for it
@@ -204,16 +204,16 @@ class Population:
 
         # update stop-condition-related variables in output
         output.current_iter += 1 # increase iteration counter
-        pocket_candidate = output.get_best() # get the best fitness Individual in the new generation
+        output_best = output.get_best() # get the best fitness Individual in the new generation
         # check if the next generation is stagnant by checking if the diff of the best fitness scores is less
         # than or equal to the defined stagnation_diff
-        if np.absolute(self.best_score() - pocket_candidate.fitness_score) <= self.stagnation_diff:
+        if np.absolute(self.best_score() - output_best.fitness_score) <= self.stagnation_diff:
             output.current_stagnant_iter += 1 # if so, increase stagnation counter by 1
         else:
             output.current_stagnant_iter = 0 # otherwise, this generation is not stagnant and the counter is zeroed
         # pocket
-        if pocket_candidate < output.pocket: # if new best Individual is better than the pocket individual
-            output.pocket = pocket_candidate # make it the new pocket Individual
+        # if pocket_candidate < output.pocket: # if new best Individual is better than the pocket individual
+        #     output.pocket = pocket_candidate # make it the new pocket Individual
 
         return output
 
