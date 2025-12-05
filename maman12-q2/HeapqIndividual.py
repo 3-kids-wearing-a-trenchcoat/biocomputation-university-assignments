@@ -36,7 +36,7 @@ class HeapqIndividual:
     def list(self) -> list[Individual]:
         return [self.data[i][1] for i in range(self.max_size)]
 
-    def get(self, index:int):
+    def get(self, index:int) -> Individual:
         if index >= self.max_size or index < (self.max_size * -1):
             raise IndexError("index" + str(index) + " out of bounds for HeapqIndividual of size " + str(self.max_size))
         return self.data[index][1]
