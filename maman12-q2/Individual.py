@@ -147,7 +147,7 @@ class Individual:
             return False
         if not isinstance(other, Individual):
             raise NotImplemented
-        return self.fitness_score < other.fitness_score
+        return self.fitness_score > other.fitness_score
 
     def __eq__(self, other:Individual|None) -> bool:
         if other is None:
