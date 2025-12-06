@@ -26,7 +26,7 @@ DEFAULT_PARAMS = {"rng": np.random.default_rng(123),
                   "carry_over": 2,
                   "H_path": Path(__file__).parent / "matrices" / "gene_celltype_TPM.tsv",
                   "M_path": Path(__file__).parent / "matrices" / "gene_sample_TPM.tsv",
-                  "true_result_path": Path(__file__).parent / "matrices" / "sample_celltype_groundT.tsv"
+                  "true_result_path": Path(__file__).parent / "matrices" / "sample_celltype_groundT_redacted.tsv"
                   }
 RESULT_LABELS = ["fitness score", "iterations", "cause of stop"]
 
@@ -146,16 +146,18 @@ def compare(var1:str, start1:float, step1:float, end1:float,
     stop_reason_df = pd.DataFrame(stop_reason_matrix, var1_labels, var2_labels)
     return list([fitness_df, iteration_df, stop_reason_df])
 
+def get_true_results() -> NDArray[FTYPE]:
+    return parse_input_matrix(DEFAULT_PARAMS.get("true_result_path"))
 
 if __name__ == "__main__":
 
-    # params = {"M": M, "H": H}
-    # experiment = set_parameters(params)
-    # experiment.run()
-    # # TODO: what comes next is just a quick experiment to see it works
-    # print(experiment.result)
-    # print(experiment.result_fitness_score)
-    df_arr = compare("mut_prob", 0.005, 0.005, 0.1)
-    for df in df_arr:
-        print(df)
+    params = dict()
+    experiment = set_parameters(params)
+    experiment.run()
+    print(experiment.result)
+    print(experiment.result_fitness_score)
+    # result_phen = experiment.result
+    # result_fitness = experiment.result_fitness_score
+
+
 
