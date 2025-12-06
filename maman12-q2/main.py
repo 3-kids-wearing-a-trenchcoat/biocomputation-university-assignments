@@ -10,15 +10,15 @@ from RNASeqDeconvolution import RNASeqDeconvolution
 
 # default values
 DEFAULT_PARAMS = {"rng": np.random.default_rng(123),
-                  "mut_prob": 0.2,
-                  "mut_standard_deviation": 0.2,
+                  "mut_prob": 0.003,
+                  "mut_standard_deviation": 0.55,
                   "crossover_prob": 0.9,
-                  "max_iter": 3000,
+                  "max_iter": 5000,
                   # "max_iter": 999999999,
                   "satisfactory": 1e-3,
-                  "stagnation_limit": 200,
+                  "stagnation_limit": 300,
                   # "stagnation_limit": 99999,
-                  "stagnation_diff": 1e-3,
+                  "stagnation_diff": 1e-9,
                   "pop_size": 200,
                   "win_prob": 0.7,
                   "init_sigma": 0.7,
@@ -147,17 +147,21 @@ def compare(var1:str, start1:float, step1:float, end1:float,
     return list([fitness_df, iteration_df, stop_reason_df])
 
 def get_true_results() -> NDArray[FTYPE]:
-    return parse_input_matrix(DEFAULT_PARAMS.get("true_result_path"))
+    return parse_input_matrix(DEFAULT_PARAMS.get("true_result_path")).transpose()
 
 if __name__ == "__main__":
-
     params = dict()
     experiment = set_parameters(params)
     experiment.run()
-    print(experiment.result)
-    print(experiment.result_fitness_score)
-    # result_phen = experiment.result
-    # result_fitness = experiment.result_fitness_score
+    result_phen = experiment.result
+    result_fitness = experiment.result_fitness_score
+    true_phen = get_true_results()
+
+    print("result phen:")
+    print(pd.DataFrame(result_phen))
+    print("result fitness score: " + str(result_fitness))
+    print("difference from true results:")
+    print(pd.DataFrame(result_phen - true_phen))
 
 
 
