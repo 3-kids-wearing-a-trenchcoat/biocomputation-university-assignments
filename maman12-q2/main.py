@@ -75,7 +75,7 @@ def set_parameters(input_params: dict[str, float | int | NDArray[FTYPE] | np.ran
 
 def compare(var1: str, start1: float, step1: float, end1: float,
             var2: str | None = None, start2: float | None = None, step2: float | None = None, end2: float | None = None) \
-        -> list[pd.DataFrame]:
+            -> pd.DataFrame:
     """
     Generate a comparison matrix for different values of one or two variables.
     :param var1: name of variable to change
@@ -96,8 +96,6 @@ def compare(var1: str, start1: float, step1: float, end1: float,
     var1_values = list([start1])
     var1_labels = list([var1 + " = " + str(start1)])
     while var1_values[-1] < end1:
-        # var1_values += var1_values[-1] + step1
-        # var1_labels += var1 + " = " + str(var1_values[-1])
         var1_values.append(var1_values[-1] + step1)
         var1_labels.append(var1 + " = " + str(var1_values[-1]))
     # if var2 isn't specified
@@ -111,16 +109,15 @@ def compare(var1: str, start1: float, step1: float, end1: float,
             result_matrix += [[experiment.result_fitness_score, experiment.pop.current_iter,
                                experiment.detect_stop_reason()]]  # extract fitness score, iteration and stop reason
         output = pd.DataFrame(result_matrix, var1_labels, RESULT_LABELS)  # wrap in pandas DataFrame
-        return [output]  # wrap output in list of size 1
+        return output  # wrap output in list of size 1
 
     # if var2 IS specified
     # initialize var2 values and labels
-    fitness_matrix, iteration_matrix, stop_reason_matrix = [], [], []
+    # fitness_matrix, iteration_matrix, stop_reason_matrix = [], [], []
+    fitness_matrix = []
     var2_values = list([start2])
     var2_labels = list([var2 + " = " + str(start2)])
     while var2_values[-1] < end2:
-        # var2_values += var2_values[-1] + step2
-        # var2_labels += var2 + " = " + str(var2_values[-1])
         var2_values.append(var2_values[-1] + step2)
         var2_labels.append(var2 + " = " + str(var2_values[-1]))
     # testing all (var1 x var2) pairs
@@ -129,7 +126,8 @@ def compare(var1: str, start1: float, step1: float, end1: float,
     for i in pbar1:  # for each var1 value
         pbar1.set_postfix_str(var1_labels[i])
         # initialize result rows
-        fitness_row, iteration_row, stop_reason_row = [], [], []
+        # fitness_row, iteration_row, stop_reason_row = [], [], []
+        fitness_row = []
         for j in pbar2:  # for each var2 value
             pbar2.set_postfix_str(var2_labels[j])
             # run experiment
@@ -137,18 +135,19 @@ def compare(var1: str, start1: float, step1: float, end1: float,
             experiment.run(False, 2)
             # update result rows
             fitness_row.append(experiment.result_fitness_score)
-            iteration_row.append(experiment.pop.current_iter)
-            stop_reason_row.append(experiment.detect_stop_reason())
+            # iteration_row.append(experiment.pop.current_iter)
+            # stop_reason_row.append(experiment.detect_stop_reason())
         # finished checking all var2 values for this specific var1 value, update matrices with the rows we got
         fitness_matrix += [fitness_row]
-        iteration_matrix += [iteration_row]
-        stop_reason_matrix += [stop_reason_row]
+        # iteration_matrix += [iteration_row]
+        # stop_reason_matrix += [stop_reason_row]
 
     # wrap in DataFrame and output
     fitness_df = pd.DataFrame(fitness_matrix, var1_labels, var2_labels)
-    iteration_df = pd.DataFrame(iteration_matrix, var1_labels, var2_labels)
-    stop_reason_df = pd.DataFrame(stop_reason_matrix, var1_labels, var2_labels)
-    return list([fitness_df, iteration_df, stop_reason_df])
+    # iteration_df = pd.DataFrame(iteration_matrix, var1_labels, var2_labels)
+    # stop_reason_df = pd.DataFrame(stop_reason_matrix, var1_labels, var2_labels)
+    # return list([fitness_df, iteration_df, stop_reason_df])
+    return fitness_df
 
 
 # def get_true_results() -> NDArray[FTYPE]:
