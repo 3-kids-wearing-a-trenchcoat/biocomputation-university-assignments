@@ -31,7 +31,7 @@ class RNASeqDeconvolution:
         if generation.current_iter >= generation.max_iter:
             self.stop_reason = "iteration limit"
         elif generation.current_stagnant_iter >= generation.stagnation_limit:
-            self.stop_reason = str(generation.stagnation_limit) + "consecutive stagnant iterations"
+            self.stop_reason = str(generation.stagnation_limit) + " consecutive stagnant iterations"
         else:
             self.stop_reason = "satisfactory fitness score"
         return self.stop_reason
