@@ -9,7 +9,8 @@ from Population import Population
 from RNASeqDeconvolution import RNASeqDeconvolution
 
 # default values
-DEFAULT_PARAMS = {"rng": np.random.default_rng(123),
+DEFAULT_PARAMS = {"rng_seed": 123,
+                  # "rng": np.random.default_rng(123),
                   "mut_prob": 0.003,
                   "mut_standard_deviation": 0.55,
                   "crossover_prob": 0.9,
