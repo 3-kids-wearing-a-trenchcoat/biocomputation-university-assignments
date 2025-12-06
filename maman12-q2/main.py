@@ -13,7 +13,7 @@ DEFAULT_PARAMS = {"rng": np.random.default_rng(123),
                   "mut_prob": 0.2,
                   "mut_standard_deviation": 0.2,
                   "crossover_prob": 0.9,
-                  "max_iter": 2000,
+                  "max_iter": 3000,
                   # "max_iter": 999999999,
                   "satisfactory": 1e-3,
                   "stagnation_limit": 200,
@@ -99,7 +99,7 @@ def compare(var1:str, start1:float, step1:float, end1:float,
     # if var2 isn't specified
     if var2 is None: # only testing var1, everything else is as default
         result_matrix = []
-        pbar = tqdm(range(len(var1_values)), total=len(var1_values), dynamic_ncols=True, position=0)
+        pbar = tqdm(range(len(var1_values)), total=len(var1_values), dynamic_ncols=True, position=0, leave=False)
         for i in pbar: # for each value
             pbar.set_postfix_str(var1_labels[i])
             experiment = set_parameters({var1: var1_values[i]}) # set experiment to use current var1 value
@@ -120,8 +120,8 @@ def compare(var1:str, start1:float, step1:float, end1:float,
         var2_values.append(var2_values[-1] + step2)
         var2_labels.append(var2 + " = " + str(var2_values[-1]))
     # testing all (var1 x var2) pairs
-    pbar1 = trange(len(var1_values), total=len(var1_values), dynamic_ncols=True, position=0)
-    pbar2 = trange(len(var2_values), total=len(var2_values), dynamic_ncols=True, position=1)
+    pbar1 = trange(len(var1_values), total=len(var1_values), dynamic_ncols=True, position=0, leave=False)
+    pbar2 = trange(len(var2_values), total=len(var2_values), dynamic_ncols=True, position=1, leave=False)
     for i in pbar1: # for each var1 value
         pbar1.set_postfix_str(var1_labels[i])
         # initialize result rows
@@ -132,9 +132,9 @@ def compare(var1:str, start1:float, step1:float, end1:float,
             experiment = set_parameters({var1: var1_values[i], var2: var2_values[j]})
             experiment.run(False, 2)
             # update result rows
-            fitness_row += experiment.result_fitness_score
-            iteration_row += experiment.pop.current_iter
-            stop_reason_row += experiment.detect_stop_reason()
+            fitness_row.append(experiment.result_fitness_score)
+            iteration_row.append(experiment.pop.current_iter)
+            stop_reason_row.append(experiment.detect_stop_reason())
         # finished checking all var2 values for this specific var1 value, update matrices with the rows we got
         fitness_matrix += [fitness_row]
         iteration_matrix += [iteration_row]
