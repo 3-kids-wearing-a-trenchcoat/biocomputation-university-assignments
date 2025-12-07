@@ -47,12 +47,13 @@ M = parse_input_matrix(DEFAULT_PARAMS.get("M_path"))
 H = parse_input_matrix(DEFAULT_PARAMS.get("H_path"))
 DEFAULT_PARAMS["M"], DEFAULT_PARAMS["H"] = M, H
 
-def set_parameters(input_params: dict[str, float | int | NDArray[FTYPE] | np.random.Generator]) -> RNASeqDeconvolution:
+def set_parameters(input_params: dict[str, float | int | NDArray[FTYPE] | np.random.Generator], calc_mean=False) -> RNASeqDeconvolution:
     """
     Helper function which initializes the **many** variables across Population and Individual.
     Each variable-value pair in params has that value set for that variable.
     Every variable not in params is set to the default
     :param input_params: dict[str, Any] - key is variable name as a string, value is the value to assign to the variable
+    :param calc_mean: whether to calculate the mean value at each iteration, reduces performance
     :return: RNASeqDeconvolution object with the variables set as specified
     """
     # start with parameters as specified in defaults
@@ -68,7 +69,8 @@ def set_parameters(input_params: dict[str, float | int | NDArray[FTYPE] | np.ran
                                p["crossover_prob"], p["M"], p["H"])
     # Initialize Population
     pop = Population(p["max_iter"], p["satisfactory"], p["stagnation_limit"], p["stagnation_diff"],
-                     p["pop_size"], p["win_prob"], p["init_sigma"], p["tournament_participants"], p["carry_over"])
+                     p["pop_size"], p["win_prob"], p["init_sigma"], p["tournament_participants"], p["carry_over"],
+                     calc_mean)
     # return RNASeqDeconvolution initialized with pop
     return RNASeqDeconvolution(pop)
 
@@ -178,7 +180,7 @@ def compare_to_true_results(phen:NDArray[FTYPE]) -> pd.DataFrame:
 
 if __name__ == "__main__":
     params = dict()
-    experiment = set_parameters(params)
+    experiment = set_parameters(params, True)
     experiment.run()
     result_phen = experiment.result
     result_fitness = experiment.result_fitness_score

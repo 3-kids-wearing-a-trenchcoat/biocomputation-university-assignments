@@ -17,6 +17,8 @@ class RNASeqDeconvolution:
         """
         self.best_history = [] # history of best fitness value per iteration
         self.worst_history = [] # history of worst fitness value per iteration
+        self.mean_history = [] # history of mean fitness values
+        self.check_mean = pop.calculate_mean # whether to check mean
         self.pop = pop # Population object that implements the actual algorithm using Individual
         self.result: NDArray[FTYPE]|None = None # result at the end of the run (phenotype of pocket Individual)
         self.result_fitness_score: float|None = None
@@ -44,10 +46,16 @@ class RNASeqDeconvolution:
         for generation in pbar:
             self.best_history.append(generation.best_score())
             self.worst_history.append(generation.worst_fitness_score)
-            # pocket_score = generation.pocket.fitness_score
-            pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
-                                 f"worst score: {self.worst_history[-1]:.4f}, "
-                                 f"stagnant iterations: {generation.current_stagnant_iter}")
+            if self.check_mean:
+                self.mean_history.append(generation.get_mean())
+                pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
+                                     f"worst score: {self.worst_history[-1]:.4f}, "
+                                     f"mean score: {self.mean_history[-1]:.4f}, "
+                                     f"stagnant iterations: {generation.current_stagnant_iter}")
+            else:
+                pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
+                                     f"worst score: {self.worst_history[-1]:.4f}, "
+                                     f"stagnant iterations: {generation.current_stagnant_iter}")
         self.pop = generation
         if print_stop_reason:
             print(self.detect_stop_reason(generation))
