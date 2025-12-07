@@ -11,19 +11,19 @@ from RNASeqDeconvolution import RNASeqDeconvolution
 # default values
 DEFAULT_PARAMS = {"rng_seed": 123,
                   # "rng": np.random.default_rng(123),
-                  "mut_prob": 0.003,
-                  "mut_standard_deviation": 0.55,
+                  "mut_prob": 1e-5,
+                  "mut_standard_deviation": 10,
                   "crossover_prob": 0.9,
                   "max_iter": 3000,
                   # "max_iter": 999999999,
                   "satisfactory": 1e-3,
-                  "stagnation_limit": 200,
+                  "stagnation_limit": 100,
                   # "stagnation_limit": 99999,
-                  "stagnation_diff": 1e-3,
-                  "pop_size": 300,
+                  "stagnation_diff": 5e-4,
+                  "pop_size": 200,
                   "win_prob": 0.7,
-                  "init_sigma": 0.7,
-                  "tournament_participants": 3,
+                  "init_sigma": 1.5,
+                  "tournament_participants": 2,
                   "carry_over": 2,
                   "H_path": Path(__file__).parent / "matrices" / "gene_celltype_TPM.tsv",
                   "M_path": Path(__file__).parent / "matrices" / "gene_sample_TPM.tsv",
@@ -108,9 +108,8 @@ def compare(var1: str, start1: float, step1: float, end1: float,
             pbar.set_postfix_str(var1_labels[i])
             experiment = set_parameters({var1: var1_values[i]})  # set experiment to use current var1 value
             experiment.run(False, 1)  # run experiment
-            result_matrix += [[experiment.result_fitness_score, experiment.pop.current_iter,
-                               experiment.detect_stop_reason()]]  # extract fitness score, iteration and stop reason
-        output = pd.DataFrame(result_matrix, var1_labels, RESULT_LABELS)  # wrap in pandas DataFrame
+            result_matrix += [[experiment.result_fitness_score]]  # extract fitness score
+        output = pd.DataFrame(result_matrix, var1_labels)  # wrap in pandas DataFrame
         return output  # wrap output in list of size 1
 
     # if var2 IS specified
