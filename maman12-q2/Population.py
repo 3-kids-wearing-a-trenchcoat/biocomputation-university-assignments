@@ -3,7 +3,6 @@ import numpy as np
 from numpy.typing import NDArray
 import copy
 from HeapqIndividual import HeapqIndividual as hqi
-from tqdm.auto import trange
 from Individual import Individual, FTYPE
 
 # constants
@@ -118,7 +117,7 @@ class Population:
         """
         # Initialized with Individuals to be carried over
         output.pop = self.carry_over.list() # initialize output pop with this generation's carry-over
-        output.carry_over = copy.copy(self.carry_over) # start with this carry over and update as we generate kids
+        output.carry_over = copy.deepcopy(self.carry_over) # start with this carry over and update as we generate kids
         output.worst_fitness_score = output.carry_over.get(0).fitness_score
         if self.calculate_mean:
             fitness_sum = sum([ind.fitness_score for ind in output.pop])

@@ -4,13 +4,14 @@ from numpy.typing import NDArray
 from tqdm.auto import tqdm
 from Individual import Individual, FTYPE
 from Population import Population
+from Niches import Niches
 
 class RNASeqDeconvolution:
     """This class runs the RNA-seq deconvolution genetic algorithm and produces and stores the associated results.
     In addition to the actual matrix representing the percent of cell types for a sample, these results include:
     * History of the best fitness score per iteration
     * History of the worst fitness score per iteration"""
-    def __init__(self, pop:Population):
+    def __init__(self, pop:Population|Niches):
         """
         Initialize an RNA-sequence deconvolution run
         :param pop: Initialized Population object
@@ -25,7 +26,7 @@ class RNASeqDeconvolution:
         self.confusion_matrix: NDArray[FTYPE]|None = None # confusion matrix of the result compared to true result
         self.stop_reason: str = ""
 
-    def detect_stop_reason(self, generation:Population = None) -> str:
+    def detect_stop_reason(self, generation:Population|Niches = None) -> str:
         if self.stop_reason != "":
             return self.stop_reason
         if generation is None:

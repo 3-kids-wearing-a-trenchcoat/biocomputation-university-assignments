@@ -7,27 +7,31 @@ from tqdm import tqdm, trange
 from Individual import Individual, FTYPE
 from Population import Population
 from RNASeqDeconvolution import RNASeqDeconvolution
+from Niches import Niches
 
 # default values
 DEFAULT_PARAMS = {"rng_seed": 123,
                   # "rng": np.random.default_rng(123),
-                  "mut_prob": 1e-5,
-                  "mut_standard_deviation": 10,
+                  "mut_prob": 0.01,
+                  "mut_standard_deviation": 1.25,
                   "crossover_prob": 0.9,
-                  "max_iter": 3000,
+                  "max_iter": 2000,
                   # "max_iter": 999999999,
-                  "satisfactory": 1e-3,
-                  "stagnation_limit": 100,
+                  "satisfactory": 1e-5,
+                  "stagnation_limit": 200,
                   # "stagnation_limit": 99999,
-                  "stagnation_diff": 5e-4,
-                  "pop_size": 200,
-                  "win_prob": 0.7,
-                  "init_sigma": 1.5,
-                  "tournament_participants": 2,
-                  "carry_over": 2,
+                  "stagnation_diff": 1e-6,
+                  "pop_size": 400,
+                  "win_prob": 0.9,
+                  "init_sigma": 2.5,
+                  "tournament_participants": 3,
+                  "carry_over": 20,
                   "H_path": Path(__file__).parent / "matrices" / "gene_celltype_TPM.tsv",
                   "M_path": Path(__file__).parent / "matrices" / "gene_sample_TPM.tsv",
-                  "true_result_path": Path(__file__).parent / "matrices" / "sample_celltype_groundT_redacted.tsv"
+                  "true_result_path": Path(__file__).parent / "matrices" / "sample_celltype_groundT_redacted.tsv",
+                  "niche_num": 1,
+                  "migration_interval": 50,
+                  "migrator_num": 1
                   }
 RESULT_LABELS = ["fitness score", "iterations", "cause of stop"]
 
@@ -68,9 +72,15 @@ def set_parameters(input_params: dict[str, float | int | NDArray[FTYPE] | np.ran
     Individual.set_static_vars(p["rng"], p["mut_prob"], p["mut_standard_deviation"],
                                p["crossover_prob"], p["M"], p["H"])
     # Initialize Population
-    pop = Population(p["max_iter"], p["satisfactory"], p["stagnation_limit"], p["stagnation_diff"],
+    pop = None
+    if p["niche_num"] < 2: # if less than 2 niches, it's a regular, undivided population
+        pop = Population(p["max_iter"], p["satisfactory"], p["stagnation_limit"], p["stagnation_diff"],
+                         p["pop_size"], p["win_prob"], p["init_sigma"], p["tournament_participants"], p["carry_over"],
+                         calc_mean)
+    else:
+        pop = Niches(p["max_iter"], p["satisfactory"], p["stagnation_limit"], p["stagnation_diff"],
                      p["pop_size"], p["win_prob"], p["init_sigma"], p["tournament_participants"], p["carry_over"],
-                     calc_mean)
+                     calc_mean, p["niche_num"], p["migration_interval"], p["migrator_num"])
     # return RNASeqDeconvolution initialized with pop
     return RNASeqDeconvolution(pop)
 
@@ -178,13 +188,20 @@ def compare_to_true_results(phen:NDArray[FTYPE]) -> pd.DataFrame:
     return df_diff
 
 if __name__ == "__main__":
-    params = dict()
-    experiment = set_parameters(params, True)
-    experiment.run()
-    result_phen = experiment.result
-    result_fitness = experiment.result_fitness_score
-    print("result phen:")
-    print(pd.DataFrame(result_phen))
-    print("result fitness score: " + str(result_fitness))
-    print("difference from true results:")
-    print(compare_to_true_results(result_phen))
+    # run and display output phenotype
+    experiment = set_parameters({"mut_prob": 0.01,
+                                 "crossover_prob": 0.9,
+                                 "mut_standard_deviation": 1.5,
+                                 "pop_size": 300,
+                                 "satisfactory": 1e-5,
+                                 "stagnation_limit": 200,
+                                 "stagnation_diff": 1e-6,
+                                 "tournament_participants": 3,
+                                 "win_probability": 0.9,
+                                 "init_sigma": 2.5,
+                                 "carry_over": 1,
+                                 "max_iter": 5000,
+                                 "niche_num": 3},
+                                True)
+    experiment.run(True, 0, True)
+    phen = experiment.result
