@@ -1,6 +1,4 @@
 from __future__ import annotations
-from concurrent.futures import ThreadPoolExecutor
-import atexit
 import numpy as np
 from numpy.typing import NDArray
 import copy
@@ -14,7 +12,6 @@ DEFAULT_WIN_PROB = 0.7 # default probability of top candidate to become a parent
 DEFAULT_INIT_POP_SIGMA = 0.7 # default standard deviation for random values of initial pop (mean 0)
 DEFAULT_CANDIDATE_NUM = 3 # default number of candidates in each tournament for the purpose of procreation
 DEFAULT_CARRY_OVER_NUM = 2 # default number of the best candidates which will be carried over to the next generation
-THREADS = 1 # number of workers in ThreadPoolExecutor
 DEFAULT_MAX_ITER = 1000 # default number of iterations at which we stop regardless of other stop conditions
 DEFAULT_SATISFACTORY = 1e-3 # default satisfactory fitness value, if an individual is less-than-or-equal to it, stop.
 DEFAULT_STAGNATION_LIMIT = 100 # default number of iterations at which, if no significant improvement was found, stop.
@@ -68,21 +65,10 @@ class Population:
         # the "bucket" of Individual objects that make up the population, generated randomly via normal distribution
         self.pop = [Individual(self.rng.normal(0, init_sigma, ind_size).astype(FTYPE),False)
                     for _ in range(pop_size)]
-        # self.pop = [Individual(self.rng.normal(0, init_sigma, ind_size).astype(FTYPE),False)
-        #             for _ in trange(pop_size, desc='Generating initial population', dynamic_ncols=True)]
-
-        # initialize ThreadPoolExecutor
-        self.executor = ThreadPoolExecutor(max_workers=THREADS)
-        atexit.register(self.executor.shutdown, wait=True)
-
         # The best individuals in this pop which will be carried over to the next generation
         # self.carry_over: list[Individual]|None = None
         self.carry_over: hqi = hqi(self.num_carry_over)
         [self.carry_over.push(ind) for ind in self.pop]
-        # pocket Individual - the best Individual encountered so far in all iterations that have come so far
-        # it is replaced by the current iteration's best whenever its fitness value is better than the current pocket
-        # (I already examine the best current Individual every iteration, so this is not noticeably more expensive)
-        # self.pocket: Individual|None = None
         # worst fitness score in this population
         self.worst_fitness_score = 0
 
@@ -125,38 +111,37 @@ class Population:
         parent2 = self.tournament_selection(candidates, parent1) # pick second winner that is not parent1
         return parent1, parent2
 
-    def gen_children(self, children_num) -> tuple[list[Individual], hqi, float, float]:
+    def gen_children(self, output:Population) -> None:
         """
         Generate a number of children via tournament selection and record a list of the children with the best fitness
         as well as the worst fitness score encountered
-        :param children_num: number of child Individual objects to spawn
-        :return: a tuple of the following elements in order:
-                 * list of generated children
-                 * HeapqIndividual of size self.num_carry_over containing the best elements encountered thus far
-                 * float equal to the worst (highest) fitness score encountered
-                 * sum of fitness scores, will be used to calculate mean
         """
-        output: list[Individual] = [] # list of all generated children
-        k_best: hqi = hqi(self.num_carry_over) # sorted list of the best fitness children, from worst to best
-        worst_score: float = 0 # worst fitness score encountered
-        fitness_sum: float = 0 # sum of fitness scores, will be used to calculate fitness mean
+        # Initialized with Individuals to be carried over
+        output.pop = self.carry_over.list() # initialize output pop with this generation's carry-over
+        output.carry_over = copy.copy(self.carry_over) # start with this carry over and update as we generate kids
+        output.worst_fitness_score = output.carry_over.get(0).fitness_score
+        if self.calculate_mean:
+            fitness_sum = sum([ind.fitness_score for ind in output.pop])
 
-        while len(output) < children_num:
-            parents = self.tournament() # choose parents
+        # generate children
+        while len(output.pop) < self.pop_size:
+            parents = self.tournament()  # choose parents
             children = parents[0].breed(parents[1]) # spawn children of chosen parents
-            output += children # add children to next generation
+            output.pop += children # add children to next generation
             # if either child is better than the worst in k_best, remove the worst scorer and add the child
-            k_best.push(children[0])
-            k_best.push(children[1])
+            output.carry_over.push(children[0])
+            output.carry_over.push(children[1])
             # check if either child has a fitness score worse than the worst recorded
-            if worst_score < children[0].fitness_score:
-                worst_score = children[0].fitness_score
-            if worst_score < children[1].fitness_score:
-                worst_score = children[1].fitness_score
-            # add to fitness_sum
-            fitness_sum += children[0].fitness_score + children[1].fitness_score
+            if output.worst_fitness_score < children[0].fitness_score:
+                output.worst_fitness_score = children[0].fitness_score
+            if output.worst_fitness_score < children[1].fitness_score:
+                output.worst_fitness_score = children[1].fitness_score
+            if self.calculate_mean:
+                # add to fitness_sum
+                fitness_sum += children[0].fitness_score + children[1].fitness_score
+        if self.calculate_mean: # update mean if we calculate it
+            output.mean = fitness_sum / output.pop_size
 
-        return output, k_best, worst_score, fitness_sum
 
     def get_best(self) -> Individual:
         # return self.carry_over.get(-1)
@@ -180,44 +165,9 @@ class Population:
             (self.best_score() <= self.satisfactory) or # satisfactory score
             self.current_stagnant_iter >= self.stagnation_limit): # reached stagnant iteration limit
             raise StopIteration
-        # TODO: play around with parallelization to make sure it's beneficial and if so, find a conservative value for it
-        # initialize next generation
+        # generate next generation
         output = copy.copy(self) # other than pop, all other attributes are identical and can be shallow copies
-        output.pop = [] # start with an empty pop
-        output.carry_over = hqi(self.num_carry_over) # carry_over also reset as the old values aren't relevant
-        output.worst_fitness_score = 0 # this variable refers only to this population's scores
-        output.mean = 0 # initialize mean
-
-        # generate individuals in the next generation
-        children_per_worker_base, children_per_worker_rem = divmod(self.pop_size - self.num_carry_over, THREADS)
-        # number of children each worker will generate, divided as equally possible
-        child_quant = [children_per_worker_base + 1 if i < children_per_worker_rem
-                       else children_per_worker_base
-                       for i in range(THREADS)]
-        # start parallel work
-        futures = {self.executor.submit(self.gen_children, child_quant[i]) for i in range(THREADS)}
-        # update output from each worker when they're done
-        for fut in futures:
-            fut_results = fut.result()
-            output.pop += fut_results[0] # generated children added to pop
-            output.carry_over = output.carry_over.merge(fut_results[1]) # merge k_best heaps
-            if fut_results[2] > output.worst_fitness_score: # update worst score found
-                output.worst_fitness_score = fut_results[2]
-            output.mean += fut_results[3] # mean temporarily stores sum of fitness scores
-
-        # add carry-overs from this generation to the next
-        carryover_list = self.carry_over.list()
-        # output.pop += self.carry_over.list()
-        output.pop += carryover_list
-        output.carry_over = output.carry_over.merge(self.carry_over)
-        worst_self_carry_over = self.carry_over.get(0).fitness_score # worst fitness of the Individuals carried over from this generation
-        if worst_self_carry_over > output.worst_fitness_score:
-            output.worst_fitness_score = worst_self_carry_over
-
-        # add carried-over individuals to fitness sum and turn output.mean into an actual mean of fitness scores
-        output.mean += sum([carried.fitness_score for carried in carryover_list]) # add carried individuals' fitness score
-        output.mean /= output.pop_size # turn fitness sum into mean fitness score for all individuals
-
+        self.gen_children(output)
         # update stop-condition-related variables in output
         output.current_iter += 1 # increase iteration counter
         output_best = output.get_best() # get the best fitness Individual in the new generation
@@ -227,10 +177,6 @@ class Population:
             output.current_stagnant_iter += 1 # if so, increase stagnation counter by 1
         else:
             output.current_stagnant_iter = 0 # otherwise, this generation is not stagnant and the counter is zeroed
-        # pocket
-        # if pocket_candidate < output.pocket: # if new best Individual is better than the pocket individual
-        #     output.pocket = pocket_candidate # make it the new pocket Individual
-
         return output
 
 
