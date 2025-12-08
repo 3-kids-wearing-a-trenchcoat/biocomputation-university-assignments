@@ -57,12 +57,12 @@ class Individual:
 
     def calc_phenotype(self) -> NDArray[FTYPE]:
         """Compute the column-wise softmax of the genotype matrix, which is the phenotype."""
-        # eps: float = 1e-12 # tiny epsilon added to denominator to avoid rare divisions by 0
+        # tiny epsilon added to denominator to avoid rare divisions by 0
         eps = np.finfo(FTYPE).tiny # tiny epsilon added to denominator to avoid rare divisions by 0
         # subtract column max from every element, reduces the likelihood of overflow without changing softmax
-        genotype_shift = self.genotype - np.max(self.genotype, axis=1, keepdims=True)
+        genotype_shift = self.genotype - np.max(self.genotype, axis=0, keepdims=True)
         exp_g = np.exp(genotype_shift) # apply exp on every element (numerator)
-        sum_exp = np.sum(exp_g, axis=1, keepdims=True) # sum columns (denominator)
+        sum_exp = np.sum(exp_g, axis=0, keepdims=True) # sum columns (denominator)
         return exp_g / (sum_exp + eps)
 
     def calc_fitness_score(self) -> FTYPE:
