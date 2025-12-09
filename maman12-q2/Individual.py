@@ -55,7 +55,7 @@ class Individual:
         # add mutation to genotype and return
         return genotype + mutation
 
-    def calc_phenotype(self) -> NDArray[FTYPE]:
+    def calc_phenotype(self, discard_unclassified:bool = True) -> NDArray[FTYPE]:
         """Compute the column-wise softmax of the genotype matrix, which is the phenotype."""
         # tiny epsilon added to denominator to avoid rare divisions by 0
         eps = np.finfo(FTYPE).tiny # tiny epsilon added to denominator to avoid rare divisions by 0
@@ -63,7 +63,9 @@ class Individual:
         genotype_shift = self.genotype - np.max(self.genotype, axis=0, keepdims=True)
         exp_g = np.exp(genotype_shift) # apply exp on every element (numerator)
         sum_exp = np.sum(exp_g, axis=0, keepdims=True) # sum columns (denominator)
-        return exp_g / (sum_exp + eps)
+        if discard_unclassified:
+            return exp_g[:-1] / (sum_exp + eps) # return without 'unclassified' row
+        return exp_g / (sum_exp + eps) # return with 'unclassified' category
 
     def calc_fitness_score(self) -> FTYPE:
         """Return the Residual Sum of Squares (RSS) of the phenotype, specifically RSS(X)=||M-HX||^2
@@ -85,16 +87,19 @@ class Individual:
             self.genotype = self.apply_mutation(genotype)
         else:
             self.genotype = genotype
-        self.phenotype = self.calc_phenotype()
+        self.phenotype_with_unclassified = self.calc_phenotype(False)
+        # self.phenotype = self.calc_phenotype()
+        self.phenotype = self.phenotype_with_unclassified[:-1]
         self.fitness_score = self.calc_fitness_score()
 
     def get_genotype(self) -> NDArray[FTYPE]:
         """get genotype matrix (given as input)"""
         return self.genotype
 
-    def get_phenotype(self) -> NDArray[FTYPE]:
+    def get_phenotype(self, with_unclassified:bool=False) -> NDArray[FTYPE]:
         """get phenotype matrix (calculated upon initialization)"""
-        return self.phenotype
+        # return self.phenotype
+        return self.phenotype_with_unclassified if with_unclassified else self.phenotype
 
     def get_fitness_score(self) -> FTYPE:
         """get fitness score (calculated upon initialization)"""

@@ -60,7 +60,7 @@ class Population:
             self.mean = 0
 
         # X must be of shape (t x s), where M is of size (g x s) and H is of size (g x t)
-        ind_size = (Individual.H.shape[1], Individual.M.shape[1]) # shape of candidate solution
+        ind_size = (Individual.H.shape[1]+1, Individual.M.shape[1]) # shape of candidate solution
         # the "bucket" of Individual objects that make up the population, generated randomly via normal distribution
         self.pop = [Individual(self.rng.normal(0, init_sigma, ind_size).astype(FTYPE),False)
                     for _ in range(pop_size)]

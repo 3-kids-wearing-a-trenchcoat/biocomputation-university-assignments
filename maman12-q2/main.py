@@ -28,7 +28,7 @@ DEFAULT_PARAMS = {"rng_seed": 123,
                   "carry_over": 20,
                   "H_path": Path(__file__).parent / "matrices" / "gene_celltype_TPM.tsv",
                   "M_path": Path(__file__).parent / "matrices" / "gene_sample_TPM.tsv",
-                  "true_result_path": Path(__file__).parent / "matrices" / "sample_celltype_groundT_redacted.tsv",
+                  "true_result_path": Path(__file__).parent / "matrices" / "sample_celltype_groundT_redacted_with_unclassified.tsv",
                   "niche_num": 1,
                   "migration_interval": 50,
                   "migrator_num": 1
@@ -175,7 +175,7 @@ def compare_to_true_results(phen:NDArray[FTYPE]) -> pd.DataFrame:
     :return: pandas DataFrame of difference when subtracting true result from result we got.
              labeled in the same way as the true results
     """
-    result = phen.transpose()
+    result = phen.transpose() * 100 # convert form fractional ([0,1]) to percentage ([0,100]) representation
     true_result_df = get_true_results()
     # calculate difference between phenotype we got and true phenotype
     true_result_phenotype = true_result_df.apply(pd.to_numeric, errors="coerce").to_numpy(dtype=FTYPE)
@@ -189,10 +189,10 @@ def compare_to_true_results(phen:NDArray[FTYPE]) -> pd.DataFrame:
 
 if __name__ == "__main__":
     # run and display output phenotype
-    experiment = set_parameters({"mut_prob": 0.01,
+    experiment = set_parameters({"mut_prob": 0.005,
                                  "crossover_prob": 0.9,
-                                 "mut_standard_deviation": 1.5,
-                                 "pop_size": 300,
+                                 "mut_standard_deviation": 0.3,
+                                 "pop_size": 500,
                                  "satisfactory": 1e-5,
                                  "stagnation_limit": 200,
                                  "stagnation_diff": 1e-6,
@@ -201,7 +201,11 @@ if __name__ == "__main__":
                                  "init_sigma": 2.5,
                                  "carry_over": 1,
                                  "max_iter": 5000,
-                                 "niche_num": 3},
+                                 "niche_num": 5,
+                                 "migration_interval": 250,
+                                 "migrator_num": 5},
                                 True)
     experiment.run(True, 0, True)
     phen = experiment.result
+    print(pd.DataFrame(phen))
+    print(compare_to_true_results(phen))

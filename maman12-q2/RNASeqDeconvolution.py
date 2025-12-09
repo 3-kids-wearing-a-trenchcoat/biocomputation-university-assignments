@@ -62,6 +62,6 @@ class RNASeqDeconvolution:
             print(self.detect_stop_reason(generation))
         # self.result = generation.get_pocket().get_phenotype()
         # self.result_fitness_score = generation.get_pocket().get_fitness_score()
-        self.result = generation.get_best().get_phenotype()
+        self.result = generation.get_best().get_phenotype(True)
         self.result_fitness_score = generation.best_score()
 
