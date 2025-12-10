@@ -38,7 +38,7 @@ class Individual:
         Individual.H = H
 
     # @staticmethod
-    # def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]:
+    # def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]: # per-element mutation
     #     """Apply mutation to the given genotype by adding to it a matrix of random values.
     #     Each value in genotype has a probability of _mut_prob to have a value added to it (mutation probability).
     #     Each value to be mutated has a random, normal (gaussian) distribution value added to it.
@@ -55,16 +55,29 @@ class Individual:
     #     # add mutation to genotype and return
     #     return genotype + mutation
 
+    # @staticmethod
+    # def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]: # per-row mutation
+    #     """Apply mutation to the given genotype by adding to it a matrix of random values.
+    #     Each value in genotype has a probability of _mut_prob to have a value added to it (mutation probability).
+    #     Each value to be mutated has a random, normal (gaussian) distribution value added to it.
+    #     The normal distribution has a mean of 0 and a standard deviation of _mut_standard_deviation."""
+    #     rows, cols = genotype.shape
+    #     row_mask = Individual.rng.random((rows,)) < Individual._mut_prob
+    #     noise = Individual.rng.normal(0, Individual._mut_standard_deviation, size=genotype.shape)
+    #     noise[~row_mask.astype('bool')] = 0
+    #     return genotype + noise
+
     @staticmethod
-    def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]:
+    def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]: # per-row mutation where only one element mutates
         """Apply mutation to the given genotype by adding to it a matrix of random values.
         Each value in genotype has a probability of _mut_prob to have a value added to it (mutation probability).
         Each value to be mutated has a random, normal (gaussian) distribution value added to it.
         The normal distribution has a mean of 0 and a standard deviation of _mut_standard_deviation."""
         rows, cols = genotype.shape
-        row_mask = Individual.rng.random((rows,)) < Individual._mut_prob
-        noise = Individual.rng.normal(0, Individual._mut_standard_deviation, size=genotype.shape)
-        noise[~row_mask.astype('bool')] = 0
+        row_mask = (Individual.rng.random((rows,)) < Individual._mut_prob).astype('bool')
+        mutated_element = Individual.rng.integers(0, cols, rows) # pick random element for each row
+        noise = np.zeros_like(genotype)
+        noise[row_mask, mutated_element[row_mask]] = Individual.rng.normal(0, Individual._mut_standard_deviation)
         return genotype + noise
 
     def calc_phenotype(self, discard_unclassified:bool = True) -> NDArray[FTYPE]:
