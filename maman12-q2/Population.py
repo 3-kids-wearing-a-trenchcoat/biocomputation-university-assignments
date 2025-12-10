@@ -104,9 +104,9 @@ class Population:
         :return: tuple of two Individual objects
         """
         # TODO: reconsider efficiency if I have the time
-        candidates = self.rng.choice(self.pop, self.participants) # first group of candidates
+        candidates = self.rng.choice(self.pop, self.participants, False) # first group of candidates
         parent1 = self.tournament_selection(candidates) # pick first winner
-        candidates = self.rng.choice(self.pop, self.participants) # second group of candidates
+        candidates = self.rng.choice(self.pop, self.participants, False) # second group of candidates
         parent2 = self.tournament_selection(candidates, parent1) # pick second winner that is not parent1
         return parent1, parent2
 
