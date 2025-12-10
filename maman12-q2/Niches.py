@@ -112,6 +112,7 @@ class Niches:
             output.current_stagnant_iter += 1
         else:
             output.current_stagnant_iter = 0
+        output.current_iter += 1
         return output
 
 
