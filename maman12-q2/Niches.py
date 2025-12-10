@@ -33,6 +33,7 @@ class Niches:
         self.calculate_mean = calculate_mean
         if calculate_mean:
             self.mean=0
+            self.mean_param_std = 0
         self.stagnation_limit = stagnation_limit
         self.stagnation_diff = stagnation_diff
         # calculate per-niche size
@@ -56,6 +57,9 @@ class Niches:
 
     def get_mean(self):
         return self.mean
+
+    def get_diversity(self):
+        return self.mean_param_std
 
     def _migrate(self):
         migrators:list[list[Individual]] = []
@@ -91,6 +95,7 @@ class Niches:
             # overall mean is the mean of every niche
             fitness_mean_sum += output.niches[-1].mean
         output.mean = fitness_mean_sum / len(output.niches)
+        output.mean_param_std = np.mean([niche.mean_param_std for niche in output.niches])
 
     def __iter__(self):
         return NichesIterator(self)
