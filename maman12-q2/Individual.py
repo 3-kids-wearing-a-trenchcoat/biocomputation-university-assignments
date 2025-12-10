@@ -37,23 +37,35 @@ class Individual:
         Individual.M = M
         Individual.H = H
 
+    # @staticmethod
+    # def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]:
+    #     """Apply mutation to the given genotype by adding to it a matrix of random values.
+    #     Each value in genotype has a probability of _mut_prob to have a value added to it (mutation probability).
+    #     Each value to be mutated has a random, normal (gaussian) distribution value added to it.
+    #     The normal distribution has a mean of 0 and a standard deviation of _mut_standard_deviation."""
+    #     # "roll the dice" for every value in genotype, any value above _mut_prob will mutate
+    #     # The choice of which cells to mutate is uniformly distributed, i.e. every cell has the same chance of mutating
+    #     # that is independent of whether other cells mutated
+    #     mut_dice_roll = Individual.rng.uniform(0, 1, genotype.shape)
+    #     mut_mask = np.where(mut_dice_roll < Individual._mut_prob, True, False).astype(np.bool)
+    #     # apply mutation in cells that have been chosen for mutation
+    #     # each cell's mutation is random and normally distributed
+    #     mutation = np.zeros_like(genotype)
+    #     mutation[mut_mask] = Individual.rng.normal(0, Individual._mut_standard_deviation, mutation[mut_mask].shape)
+    #     # add mutation to genotype and return
+    #     return genotype + mutation
+
     @staticmethod
     def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]:
         """Apply mutation to the given genotype by adding to it a matrix of random values.
         Each value in genotype has a probability of _mut_prob to have a value added to it (mutation probability).
         Each value to be mutated has a random, normal (gaussian) distribution value added to it.
         The normal distribution has a mean of 0 and a standard deviation of _mut_standard_deviation."""
-        # "roll the dice" for every value in genotype, any value above _mut_prob will mutate
-        # The choice of which cells to mutate is uniformly distributed, i.e. every cell has the same chance of mutating
-        # that is independent of whether other cells mutated
-        mut_dice_roll = Individual.rng.uniform(0, 1, genotype.shape)
-        mut_mask = np.where(mut_dice_roll < Individual._mut_prob, True, False).astype(np.bool)
-        # apply mutation in cells that have been chosen for mutation
-        # each cell's mutation is random and normally distributed
-        mutation = np.zeros_like(genotype)
-        mutation[mut_mask] = Individual.rng.normal(0, Individual._mut_standard_deviation, mutation[mut_mask].shape)
-        # add mutation to genotype and return
-        return genotype + mutation
+        rows, cols = genotype.shape
+        row_mask = Individual.rng.random((rows,)) < Individual._mut_prob
+        noise = Individual.rng.normal(0, Individual._mut_standard_deviation, size=genotype.shape)
+        noise[~row_mask.astype('bool')] = 0
+        return genotype + noise
 
     def calc_phenotype(self, discard_unclassified:bool = True) -> NDArray[FTYPE]:
         """Compute the column-wise softmax of the genotype matrix, which is the phenotype."""
@@ -113,7 +125,10 @@ class Individual:
         :return: two new genotypes (2D float matrices)
         """
         # generate two arithmetically symmetrical blending rate matrices (alpha) randomly in uniform distribution
-        alpha_1 = Individual.rng.uniform(0, 1, self.genotype.shape)
+        # alpha_1 = Individual.rng.uniform(0, 1, self.genotype.shape) # element-wise
+        # row-wise blending
+        row_alpha = Individual.rng.uniform(0,1, (self.genotype.shape[0], 1)) # choose alpha for each row
+        alpha_1 = np.tile(row_alpha, self.genotype.shape[1])
         alpha_2 = np.ones_like(alpha_1) - alpha_1
         # generate child genotypes via intermediate recombination
         child_1 = self.genotype + alpha_1 * (partner.genotype - self.genotype)
