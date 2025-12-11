@@ -1,10 +1,17 @@
 from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
+from numba import njit
+from scipy.spatial import distance
 import copy
 
 # constants
-FTYPE = np.float32
+FTYPE = np.float64
+
+def ext_calc_fitness_score(H, self_phenotype, L, M):
+    mu = (H @ self_phenotype) * L
+    return np.sum(np.square(M - mu))
+
 
 class Individual:
     """An individual in the population representing a candidate solution.
@@ -17,10 +24,12 @@ class Individual:
     _crossover_prob: float = None # probability of children being produced by crossover rather than cloning
     M: NDArray[FTYPE] = None # number of sequences for gene i in sample j
     H: NDArray[FTYPE] = None # number of sequences for gene i in cell-type j
+    L: NDArray[FTYPE] = None
+    TRUE: NDArray[FTYPE] = None
 
     @staticmethod
     def set_static_vars(rng:np.random.Generator, mut_prob:float, mut_standard_deviation:float, crossover_prob:float,
-                        M:NDArray[FTYPE], H:NDArray[FTYPE]) -> None:
+                        M:NDArray[FTYPE], H:NDArray[FTYPE], TRUE:NDArray[FTYPE]|None = None) -> None:
         """
         Initialize static variables for the Individual class
         :param rng: numpy random number generator
@@ -35,7 +44,23 @@ class Individual:
         Individual._mut_standard_deviation = mut_standard_deviation
         Individual._crossover_prob = crossover_prob
         Individual.M = M
-        Individual.H = H
+        # Individual.H = H
+        # normalize each column of H so it becomes a per-celltype relative profile
+        H_row_sum = H.sum(axis=0, keepdims=True)
+         # add some miniscule value to prevent division by zero
+        H_row_sum = np.where(H_row_sum == 0, np.finfo(FTYPE).tiny, H_row_sum)
+        Individual.H = H / H_row_sum
+        # L is the per-sample TPM "library size" (the column sums of M)
+        Individual.L = M.sum(axis=1, keepdims=True)
+        Individual.L = np.where(Individual.L == 0, np.finfo(FTYPE).tiny, Individual.L)
+
+        Individual.TRUE = TRUE
+
+        # column_sum_M = M.sum(axis=1, keepdims=True)
+        # column_sum_H = H.sum(axis=1, keepdims=True)
+        # Individual.M = M / (column_sum_M + np.finfo(FTYPE).tiny)
+        # Individual.H = H / (column_sum_H + np.finfo(FTYPE).tiny)
+
 
     # @staticmethod
     # def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]: # per-element mutation
@@ -92,13 +117,28 @@ class Individual:
             return exp_g[:-1] / (sum_exp + eps) # return without 'unclassified' row
         return exp_g / (sum_exp + eps) # return with 'unclassified' category
 
+    # def calc_fitness_score(self) -> FTYPE:
+    #     """Return the Residual Sum of Squares (RSS) of the phenotype, specifically RSS(X)=||M-HX||^2
+    #     **M** - number of sequences for gene i in sample j
+    #     **H** - number of sequences for gene i in cell type j
+    #     **X** - Individual phenotype, the candidate solution"""
+    #     # return np.square(np.linalg.norm(Individual.M - Individual.H.dot(self.phenotype)))
+    #     return np.linalg.norm(Individual.M - Individual.H.dot(self.phenotype))
+
+    # def calc_fitness_score(self) -> FTYPE:
+    #     # mu = (Individual.H @ self.phenotype) * Individual.L
+    #     # return np.sum(np.square(Individual.M - mu))
+    #     return ext_calc_fitness_score(Individual.H, self.phenotype,
+    #                                   Individual.L, Individual.M)
+
+    # # TODO: SANITY CHECK - REMOVE
+    # def calc_fitness_score(self) -> FTYPE:
+    #     return np.square(np.linalg.norm(self.phenotype_with_unclassified - Individual.TRUE))
+
     def calc_fitness_score(self) -> FTYPE:
-        """Return the Residual Sum of Squares (RSS) of the phenotype, specifically RSS(X)=||M-HX||^2
-        **M** - number of sequences for gene i in sample j
-        **H** - number of sequences for gene i in cell type j
-        **X** - Individual phenotype, the candidate solution"""
-        # return np.square(np.linalg.norm(Individual.M - Individual.H.dot(self.phenotype)))
-        return np.linalg.norm(Individual.M - Individual.H.dot(self.phenotype))
+        mu = (Individual.H @ self.phenotype) * Individual.L
+        nrm_M, nrm_mu = Individual.M / Individual.L, mu / Individual.L
+        return np.sum(distance.jensenshannon(nrm_M, nrm_mu))
 
     def __init__(self, genotype: NDArray[FTYPE], mutate:bool = True):
         """
@@ -141,6 +181,7 @@ class Individual:
         # alpha_1 = Individual.rng.uniform(0, 1, self.genotype.shape) # element-wise
         # row-wise blending
         row_alpha = Individual.rng.uniform(0,1, (self.genotype.shape[0], 1)) # choose alpha for each row
+        # row_alpha = Individual.rng.uniform(0.4,0.61, (self.genotype.shape[0], 1)) # choose alpha for each row
         alpha_1 = np.tile(row_alpha, self.genotype.shape[1])
         alpha_2 = np.ones_like(alpha_1) - alpha_1
         # generate child genotypes via intermediate recombination

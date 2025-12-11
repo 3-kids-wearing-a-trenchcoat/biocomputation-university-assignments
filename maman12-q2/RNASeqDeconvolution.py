@@ -47,13 +47,13 @@ class RNASeqDeconvolution:
                     dynamic_ncols=True, leave=tqdm_leave, position=tqdm_pos)
         for generation in pbar:
             self.best_history.append(generation.best_score())
-            self.worst_history.append(generation.worst_fitness_score)
+            # self.worst_history.append(generation.worst_fitness_score)
             if self.check_mean:
-                self.mean_history.append(generation.get_mean())
+                # self.mean_history.append(generation.get_mean())
                 self.diversity_history.append(generation.get_diversity())
                 pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
-                                     f"worst score: {self.worst_history[-1]:.4f}, "
-                                     f"mean score: {self.mean_history[-1]:.4f}, "
+                                     # f"worst score: {self.worst_history[-1]:.4f}, "
+                                     # f"mean score: {self.mean_history[-1]:.4f}, "
                                      f"diversity: {self.diversity_history[-1]:.4f}, "
                                      f"stagnant iterations: {generation.current_stagnant_iter}")
             else:

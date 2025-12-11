@@ -32,7 +32,7 @@ class Niches:
         self.satisfactory = satisfactory # satisfactory score
         self.calculate_mean = calculate_mean
         if calculate_mean:
-            self.mean=0
+            # self.mean=0
             self.mean_param_std = 0
         self.stagnation_limit = stagnation_limit
         self.stagnation_diff = stagnation_diff
@@ -75,6 +75,7 @@ class Niches:
             # TODO: inefficient, look into it later
             self.niches[i].carry_over = HeapqIndividual(self.niches[i].num_carry_over)
             [self.niches[i].carry_over.push(ind) for ind in self.niches[i].pop]
+            return
 
     def gen_children(self, output:Niches) -> None:
         output.niches = []
@@ -93,8 +94,8 @@ class Niches:
             if best_in_new_niche < output.best_individual:
                 output.best_individual = best_in_new_niche
             # overall mean is the mean of every niche
-            fitness_mean_sum += output.niches[-1].mean
-        output.mean = fitness_mean_sum / len(output.niches)
+            # fitness_mean_sum += output.niches[-1].mean
+        # output.mean = fitness_mean_sum / len(output.niches)
         output.mean_param_std = np.mean([niche.mean_param_std for niche in output.niches])
 
     def __iter__(self):

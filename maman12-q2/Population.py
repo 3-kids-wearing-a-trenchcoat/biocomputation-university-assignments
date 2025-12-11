@@ -56,7 +56,7 @@ class Population:
         self.participants = tournament_participants # participants in each tournament
         self.num_carry_over = carry_over # number of the best candidates to carry over to next generation
         self.calculate_mean = calculate_mean
-        self.mean = 0
+        # self.mean = 0
         self.mean_param_std = 0
 
         # X must be of shape (t x s), where M is of size (g x s) and H is of size (g x t)
@@ -135,11 +135,11 @@ class Population:
                 output.worst_fitness_score = children[0].fitness_score
             if output.worst_fitness_score < children[1].fitness_score:
                 output.worst_fitness_score = children[1].fitness_score
-            if self.calculate_mean:
-                # add to fitness_sum
-                fitness_sum += children[0].fitness_score + children[1].fitness_score
+            # if self.calculate_mean:
+            #     # add to fitness_sum
+            #     fitness_sum += children[0].fitness_score + children[1].fitness_score
         if self.calculate_mean: # update mean if we calculate it
-            output.mean = fitness_sum / output.pop_size
+            # output.mean = fitness_sum / output.pop_size
             param_std = np.std([ind.genotype for ind in output.pop], axis=0)
             output.mean_param_std = np.mean(param_std)
 

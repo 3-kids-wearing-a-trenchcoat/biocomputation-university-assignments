@@ -4,10 +4,12 @@ from numpy.typing import NDArray, DTypeLike
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm, trange
-from Individual import Individual, FTYPE
+from Individual import Individual, FTYPE, ext_calc_fitness_score
 from Population import Population
 from RNASeqDeconvolution import RNASeqDeconvolution
 from Niches import Niches
+# TODO: for sanity check
+from scipy.spatial import distance
 
 # default values
 DEFAULT_PARAMS = {"rng_seed": 123,
@@ -50,6 +52,8 @@ def parse_input_matrix(path: Path, t: DTypeLike = FTYPE) -> NDArray:
 M = parse_input_matrix(DEFAULT_PARAMS.get("M_path"))
 H = parse_input_matrix(DEFAULT_PARAMS.get("H_path"))
 DEFAULT_PARAMS["M"], DEFAULT_PARAMS["H"] = M, H
+TRUE = parse_input_matrix(DEFAULT_PARAMS.get("true_result_path")).transpose()
+DEFAULT_PARAMS["TRUE"] = TRUE / 100
 
 def set_parameters(input_params: dict[str, float | int | NDArray[FTYPE] | np.random.Generator], calc_mean=False) -> RNASeqDeconvolution:
     """
@@ -70,7 +74,7 @@ def set_parameters(input_params: dict[str, float | int | NDArray[FTYPE] | np.ran
 
     # set static Individual parameters
     Individual.set_static_vars(p["rng"], p["mut_prob"], p["mut_standard_deviation"],
-                               p["crossover_prob"], p["M"], p["H"])
+                               p["crossover_prob"], p["M"], p["H"], p["TRUE"])
     # Initialize Population
     pop = None
     if p["niche_num"] < 2: # if less than 2 niches, it's a regular, undivided population
@@ -188,24 +192,56 @@ def compare_to_true_results(phen:NDArray[FTYPE]) -> pd.DataFrame:
     return df_diff
 
 if __name__ == "__main__":
+    # sanity check
+    experiment_ass = set_parameters(dict())
+    M = Individual.M
+    H = Individual.H
+    TRUE = Individual.TRUE
+    # RSS (original)
+    print(np.linalg.norm(M - H.dot(Individual.TRUE[:-1])))
+    # Frobenius/MSE
+    print(ext_calc_fitness_score(H, TRUE[:-1], Individual.L, M))
+    # Jensen-Shannon divergence
+    mu = (H @ TRUE[:-1]) * Individual.L
+    nrm_M, nrm_mu = Individual.M / Individual.L, mu / Individual.L
+    print(np.sum(distance.jensenshannon(nrm_M, nrm_mu)))
+
     # run and display output phenotype
-    experiment = set_parameters({"mut_prob": 0.005,
-                                 "crossover_prob": 0.9,
-                                 "mut_standard_deviation": 0.3,
-                                 "pop_size": 500,
+    experiment = set_parameters({"mut_prob": 0.04,
+                                 "crossover_prob": 0.8,
+                                 "mut_standard_deviation": 0.7,
+                                 "pop_size": 200,
                                  "satisfactory": 1e-5,
                                  "stagnation_limit": 200,
                                  "stagnation_diff": 1e-6,
                                  "tournament_participants": 3,
-                                 "win_probability": 0.9,
+                                 "win_probability": 0.85,
                                  "init_sigma": 2.5,
-                                 "carry_over": 1,
-                                 "max_iter": 5000,
-                                 "niche_num": 5,
-                                 "migration_interval": 250,
+                                 "carry_over": 10,
+                                 "max_iter": 500,
+                                 "niche_num": 2,
+                                 "migration_interval": 200,
                                  "migrator_num": 5},
                                 True)
     experiment.run(True, 0, True)
     phen = experiment.result
     print(pd.DataFrame(phen))
     print(compare_to_true_results(phen))
+
+    # best: 2231153.0406143377
+    # experiment = set_parameters({"mut_prob": 0.04,
+    #                              "crossover_prob": 0.8,
+    #                              "mut_standard_deviation": 0.7,
+    #                              "pop_size": 200,
+    #                              "satisfactory": 1e-5,
+    #                              "stagnation_limit": 200,
+    #                              "stagnation_diff": 1e-6,
+    #                              "tournament_participants": 3,
+    #                              "win_probability": 0.85,
+    #                              "init_sigma": 2.5,
+    #                              "carry_over": 10,
+    #                              "max_iter": 10000,
+    #                              "niche_num": 2,
+    #                              "migration_interval": 200,
+    #                              "migrator_num": 5},
+    #                             True)
