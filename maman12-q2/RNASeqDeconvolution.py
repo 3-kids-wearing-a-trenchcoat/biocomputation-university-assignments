@@ -40,7 +40,7 @@ class RNASeqDeconvolution:
             self.stop_reason = "satisfactory fitness score"
         return self.stop_reason
 
-    def run(self, tqdm_leave:bool=True, tqdm_pos:int=0, print_stop_reason:bool=False) -> None:
+    def run(self, tqdm_leave:bool=True, tqdm_pos:int=0, print_stop_reason:bool=True) -> None:
         """Run the RNA-seq deconvolution algorithm on the given population.
         This function doesn't return anything and its results need to be extracted with the getter methods"""
         pbar = tqdm(self.pop, total=self.pop.max_iter, desc="running RNA-seq deconvolution",
@@ -58,11 +58,11 @@ class RNASeqDeconvolution:
                                      f"stagnant iterations: {generation.current_stagnant_iter}")
             else:
                 pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
-                                     f"worst score: {self.worst_history[-1]:.4f}, "
+                                     # f"worst score: {self.worst_history[-1]:.4f}, "
                                      f"stagnant iterations: {generation.current_stagnant_iter}")
         self.pop = generation
         if print_stop_reason:
-            print(self.detect_stop_reason(generation))
+            print("stop reason: " + self.detect_stop_reason(generation))
         # self.result = generation.get_pocket().get_phenotype()
         # self.result_fitness_score = generation.get_pocket().get_fitness_score()
         self.result = generation.get_best().get_phenotype(True)
