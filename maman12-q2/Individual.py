@@ -2,15 +2,41 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from numba import njit
-from scipy.spatial import distance
-import copy
+from Markers import redact_to_marker_genes
 
 # constants
 FTYPE = np.float64
 
+@njit
 def ext_calc_fitness_score(H, self_phenotype, L, M):
     mu = (H @ self_phenotype) * L
     return np.sum(np.square(M - mu))
+
+@njit
+def ext_calc_phenotype(self_genotype, discard_unclassified: bool = True) -> NDArray[FTYPE]:
+    """Compute the column-wise softmax of the genotype matrix, which is the phenotype."""
+    # tiny epsilon added to denominator to avoid rare divisions by 0
+    eps = np.finfo(FTYPE).tiny  # tiny epsilon added to denominator to avoid rare divisions by 0
+    # subtract column max from every element, reduces the likelihood of overflow without changing softmax
+    # genotype_shift = self_genotype - np.max(self_genotype, axis=0, keepdims=True)
+    exp_g = np.exp(self_genotype)  # apply exp on every element (numerator)
+    sum_exp = np.sum(exp_g, axis=0)  # sum columns (denominator)
+    if discard_unclassified:
+        return exp_g[:-1] / (sum_exp + eps)  # return without 'unclassified' row
+    return exp_g / (sum_exp + eps)  # return with 'unclassified' category
+
+@njit
+def ext_apply_mutation(genotype, rng, mut_prob, mut_std):
+    rows, cols = genotype.shape
+    out = genotype.copy()
+
+    row_mask = rng.random(rows) < mut_prob
+    mutated_element = rng.integers(0, cols, rows)
+    for i in range(rows):
+        if row_mask[i]:
+            out[i, mutated_element[i]] += rng.normal(0.0, mut_std)
+
+    return out
 
 
 class Individual:
@@ -29,7 +55,9 @@ class Individual:
 
     @staticmethod
     def set_static_vars(rng:np.random.Generator, mut_prob:float, mut_standard_deviation:float, crossover_prob:float,
-                        M:NDArray[FTYPE], H:NDArray[FTYPE], TRUE:NDArray[FTYPE]|None = None) -> None:
+                        M:NDArray[FTYPE], H:NDArray[FTYPE], TRUE:NDArray[FTYPE]|None = None,
+                        use_marker_genes:bool = True, top_n:int = 200, min_mean:float = 1e-6,
+                        log_transform:bool = True) -> None:
         """
         Initialize static variables for the Individual class
         :param rng: numpy random number generator
@@ -38,59 +66,30 @@ class Individual:
         :param crossover_prob: probability of offspring Individual to be the result of crossover rather than cloning
         :param M: Matrix where the cell at index (i,j) represents the number of sequences for gene i in sample j
         :param H: Matrix where the cell at index (i,j) represents the number of sequences for gene i in cell type j
+        :param use_marker_genes: whether to limit H to marker genes
+        :param top_n: number of marker genes (highest variance for each cell-type among genes)
+        :param min_mean: treat any genes with a mean (across cell-types) lower than this as noise
+        :param log_transform: whether to apply log_transform on H before choosing marker genes, reduces impact of high values.
         """
         Individual.rng = rng
         Individual._mut_prob = mut_prob
         Individual._mut_standard_deviation = mut_standard_deviation
         Individual._crossover_prob = crossover_prob
-        Individual.M = M
-        # Individual.H = H
+        if use_marker_genes:
+            # Choose marker genes and redact H and M to just those genes
+            Individual.H, Individual.M = redact_to_marker_genes(H, M, top_n, min_mean, log_transform)
+        else:
+            Individual.M, Individual.H = M, H
         # normalize each column of H so it becomes a per-celltype relative profile
-        H_row_sum = H.sum(axis=0, keepdims=True)
+        h_col_sum = Individual.H.sum(axis=0, keepdims=True)
          # add some miniscule value to prevent division by zero
-        H_row_sum = np.where(H_row_sum == 0, np.finfo(FTYPE).tiny, H_row_sum)
-        Individual.H = H / H_row_sum
+        h_col_sum = np.where(h_col_sum == 0, np.finfo(FTYPE).tiny, h_col_sum)
+        Individual.H = Individual.H / h_col_sum
         # L is the per-sample TPM "library size" (the column sums of M)
-        Individual.L = M.sum(axis=1, keepdims=True)
+        Individual.L = Individual.M.sum(axis=0, keepdims=True)
         Individual.L = np.where(Individual.L == 0, np.finfo(FTYPE).tiny, Individual.L)
 
         Individual.TRUE = TRUE
-
-        # column_sum_M = M.sum(axis=1, keepdims=True)
-        # column_sum_H = H.sum(axis=1, keepdims=True)
-        # Individual.M = M / (column_sum_M + np.finfo(FTYPE).tiny)
-        # Individual.H = H / (column_sum_H + np.finfo(FTYPE).tiny)
-
-
-    # @staticmethod
-    # def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]: # per-element mutation
-    #     """Apply mutation to the given genotype by adding to it a matrix of random values.
-    #     Each value in genotype has a probability of _mut_prob to have a value added to it (mutation probability).
-    #     Each value to be mutated has a random, normal (gaussian) distribution value added to it.
-    #     The normal distribution has a mean of 0 and a standard deviation of _mut_standard_deviation."""
-    #     # "roll the dice" for every value in genotype, any value above _mut_prob will mutate
-    #     # The choice of which cells to mutate is uniformly distributed, i.e. every cell has the same chance of mutating
-    #     # that is independent of whether other cells mutated
-    #     mut_dice_roll = Individual.rng.uniform(0, 1, genotype.shape)
-    #     mut_mask = np.where(mut_dice_roll < Individual._mut_prob, True, False).astype(np.bool)
-    #     # apply mutation in cells that have been chosen for mutation
-    #     # each cell's mutation is random and normally distributed
-    #     mutation = np.zeros_like(genotype)
-    #     mutation[mut_mask] = Individual.rng.normal(0, Individual._mut_standard_deviation, mutation[mut_mask].shape)
-    #     # add mutation to genotype and return
-    #     return genotype + mutation
-
-    # @staticmethod
-    # def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]: # per-row mutation
-    #     """Apply mutation to the given genotype by adding to it a matrix of random values.
-    #     Each value in genotype has a probability of _mut_prob to have a value added to it (mutation probability).
-    #     Each value to be mutated has a random, normal (gaussian) distribution value added to it.
-    #     The normal distribution has a mean of 0 and a standard deviation of _mut_standard_deviation."""
-    #     rows, cols = genotype.shape
-    #     row_mask = Individual.rng.random((rows,)) < Individual._mut_prob
-    #     noise = Individual.rng.normal(0, Individual._mut_standard_deviation, size=genotype.shape)
-    #     noise[~row_mask.astype('bool')] = 0
-    #     return genotype + noise
 
     @staticmethod
     def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]: # per-row mutation where only one element mutates
@@ -98,47 +97,32 @@ class Individual:
         Each value in genotype has a probability of _mut_prob to have a value added to it (mutation probability).
         Each value to be mutated has a random, normal (gaussian) distribution value added to it.
         The normal distribution has a mean of 0 and a standard deviation of _mut_standard_deviation."""
-        rows, cols = genotype.shape
-        row_mask = (Individual.rng.random((rows,)) < Individual._mut_prob).astype('bool')
-        mutated_element = Individual.rng.integers(0, cols, rows) # pick random element for each row
-        noise = np.zeros_like(genotype)
-        noise[row_mask, mutated_element[row_mask]] = Individual.rng.normal(0, Individual._mut_standard_deviation)
-        return genotype + noise
+        # rows, cols = genotype.shape
+        # row_mask = (Individual.rng.random((rows,)) < Individual._mut_prob).astype('bool')
+        # mutated_element = Individual.rng.integers(0, cols, rows) # pick random element for each row
+        # noise = np.zeros_like(genotype)
+        # noise[row_mask, mutated_element[row_mask]] = Individual.rng.normal(0, Individual._mut_standard_deviation, size=row_mask.sum())
+        # return genotype + noise
+        return ext_apply_mutation(genotype, Individual.rng, Individual._mut_prob, Individual._mut_standard_deviation)
 
     def calc_phenotype(self, discard_unclassified:bool = True) -> NDArray[FTYPE]:
         """Compute the column-wise softmax of the genotype matrix, which is the phenotype."""
-        # tiny epsilon added to denominator to avoid rare divisions by 0
-        eps = np.finfo(FTYPE).tiny # tiny epsilon added to denominator to avoid rare divisions by 0
-        # subtract column max from every element, reduces the likelihood of overflow without changing softmax
-        genotype_shift = self.genotype - np.max(self.genotype, axis=0, keepdims=True)
-        exp_g = np.exp(genotype_shift) # apply exp on every element (numerator)
-        sum_exp = np.sum(exp_g, axis=0, keepdims=True) # sum columns (denominator)
-        if discard_unclassified:
-            return exp_g[:-1] / (sum_exp + eps) # return without 'unclassified' row
-        return exp_g / (sum_exp + eps) # return with 'unclassified' category
-
-    # def calc_fitness_score(self) -> FTYPE:
-    #     """Return the Residual Sum of Squares (RSS) of the phenotype, specifically RSS(X)=||M-HX||^2
-    #     **M** - number of sequences for gene i in sample j
-    #     **H** - number of sequences for gene i in cell type j
-    #     **X** - Individual phenotype, the candidate solution"""
-    #     # return np.square(np.linalg.norm(Individual.M - Individual.H.dot(self.phenotype)))
-    #     return np.linalg.norm(Individual.M - Individual.H.dot(self.phenotype))
-
-    # def calc_fitness_score(self) -> FTYPE:
-    #     # mu = (Individual.H @ self.phenotype) * Individual.L
-    #     # return np.sum(np.square(Individual.M - mu))
-    #     return ext_calc_fitness_score(Individual.H, self.phenotype,
-    #                                   Individual.L, Individual.M)
-
-    # # TODO: SANITY CHECK - REMOVE
-    # def calc_fitness_score(self) -> FTYPE:
-    #     return np.square(np.linalg.norm(self.phenotype_with_unclassified - Individual.TRUE))
+        # # tiny epsilon added to denominator to avoid rare divisions by 0
+        # eps = np.finfo(FTYPE).tiny # tiny epsilon added to denominator to avoid rare divisions by 0
+        # # subtract column max from every element, reduces the likelihood of overflow without changing softmax
+        # genotype_shift = self.genotype - np.max(self.genotype, axis=0, keepdims=True)
+        # exp_g = np.exp(genotype_shift) # apply exp on every element (numerator)
+        # sum_exp = np.sum(exp_g, axis=0, keepdims=True) # sum columns (denominator)
+        # if discard_unclassified:
+        #     return exp_g[:-1] / (sum_exp + eps) # return without 'unclassified' row
+        # return exp_g / (sum_exp + eps) # return with 'unclassified' category
+        return ext_calc_phenotype(self.genotype, discard_unclassified)
 
     def calc_fitness_score(self) -> FTYPE:
-        mu = (Individual.H @ self.phenotype) * Individual.L
-        nrm_M, nrm_mu = Individual.M / Individual.L, mu / Individual.L
-        return np.sum(distance.jensenshannon(nrm_M, nrm_mu))
+        # mu = (Individual.H @ self.phenotype) * Individual.L
+        # return np.sum(np.square(Individual.M - mu))
+        return ext_calc_fitness_score(Individual.H, self.phenotype,
+                                      Individual.L, Individual.M)
 
     def __init__(self, genotype: NDArray[FTYPE], mutate:bool = True):
         """
@@ -154,7 +138,8 @@ class Individual:
             self.genotype = genotype
         self.phenotype_with_unclassified = self.calc_phenotype(False)
         # self.phenotype = self.calc_phenotype()
-        self.phenotype = self.phenotype_with_unclassified[:-1]
+        # self.phenotype = self.phenotype_with_unclassified[:-1]
+        self.phenotype = self.phenotype_with_unclassified
         self.fitness_score = self.calc_fitness_score()
 
     def get_genotype(self) -> NDArray[FTYPE]:
