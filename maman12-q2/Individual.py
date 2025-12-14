@@ -29,14 +29,25 @@ def ext_calc_phenotype(self_genotype, discard_unclassified: bool = True) -> NDAr
 def ext_apply_mutation(genotype, rng, mut_prob, mut_std):
     rows, cols = genotype.shape
     out = genotype.copy()
-
     row_mask = rng.random(rows) < mut_prob
     mutated_element = rng.integers(0, cols, rows)
     for i in range(rows):
         if row_mask[i]:
             out[i, mutated_element[i]] += rng.normal(0.0, mut_std)
-
     return out
+
+@njit
+def ext_crossover(self_gen:NDArray, partner_gen:NDArray, rng:np.random.Generator) -> tuple[NDArray, NDArray]:
+    # row-wise blending
+    # row_alpha = rng.uniform(0,1, (self_gen.shape[0], 1)) # choose alpha for each row
+    # alpha_1 = np.tile(row_alpha, self_gen.shape[1])
+    alpha_1 = rng.uniform(0,1, (self_gen.shape[0], 1)) # choose alpha for each row
+    alpha_2 = np.ones_like(alpha_1) - alpha_1
+    # generate child genotypes via intermediate recombination
+    child_1 = self_gen + alpha_1 * (partner_gen - self_gen)
+    child_2 = self_gen + alpha_2 * (partner_gen - self_gen)
+    # return both genotypes
+    return child_1, child_2
 
 
 class Individual:
@@ -162,18 +173,19 @@ class Individual:
         :param partner: Individual with which this Individual produces offsprings
         :return: two new genotypes (2D float matrices)
         """
-        # generate two arithmetically symmetrical blending rate matrices (alpha) randomly in uniform distribution
-        # alpha_1 = Individual.rng.uniform(0, 1, self.genotype.shape) # element-wise
-        # row-wise blending
-        row_alpha = Individual.rng.uniform(0,1, (self.genotype.shape[0], 1)) # choose alpha for each row
-        # row_alpha = Individual.rng.uniform(0.4,0.61, (self.genotype.shape[0], 1)) # choose alpha for each row
-        alpha_1 = np.tile(row_alpha, self.genotype.shape[1])
-        alpha_2 = np.ones_like(alpha_1) - alpha_1
-        # generate child genotypes via intermediate recombination
-        child_1 = self.genotype + alpha_1 * (partner.genotype - self.genotype)
-        child_2 = self.genotype + alpha_2 * (partner.genotype - self.genotype)
-        # return both genotypes
-        return child_1, child_2
+        # # generate two arithmetically symmetrical blending rate matrices (alpha) randomly in uniform distribution
+        # # alpha_1 = Individual.rng.uniform(0, 1, self.genotype.shape) # element-wise
+        # # row-wise blending
+        # row_alpha = Individual.rng.uniform(0,1, (self.genotype.shape[0], 1)) # choose alpha for each row
+        # # row_alpha = Individual.rng.uniform(0.4,0.61, (self.genotype.shape[0], 1)) # choose alpha for each row
+        # alpha_1 = np.tile(row_alpha, self.genotype.shape[1])
+        # alpha_2 = np.ones_like(alpha_1) - alpha_1
+        # # generate child genotypes via intermediate recombination
+        # child_1 = self.genotype + alpha_1 * (partner.genotype - self.genotype)
+        # child_2 = self.genotype + alpha_2 * (partner.genotype - self.genotype)
+        # # return both genotypes
+        # return child_1, child_2
+        return ext_crossover(self.genotype, partner.genotype, Individual.rng)
 
     def breed(self, partner:Individual) -> tuple[Individual, Individual]:
         """
