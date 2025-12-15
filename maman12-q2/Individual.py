@@ -10,7 +10,7 @@ FTYPE = np.float64
 @njit
 def ext_calc_fitness_score(H, self_phenotype, L, M):
     mu = (H @ self_phenotype) * L
-    return np.sum(np.square(M - mu))
+    return np.square(np.linalg.norm(M-mu))
 
 @njit
 def ext_calc_phenotype(self_genotype, discard_unclassified: bool = True) -> NDArray[FTYPE]:
