@@ -1,6 +1,5 @@
 from __future__ import annotations
 import numpy as np
-from numpy.typing import NDArray
 import copy
 from Individual import Individual
 from Population import Population
@@ -24,7 +23,6 @@ class Niches:
                  niche_num:int = DEFAULT_NICHE_NUM, migration_interval:int = DEFAULT_MIGRATION_INTERVAL,
                  migrator_num:int=DEFAULT_MIGRATOR_NUM):
         # set initial values
-        # self.niches:list[Population] = [] # group of niches
         self.current_iter = 0 # iteration counter
         self.rng = Individual.rng # shared random number generator
         self.max_iter = max_iter # maximum iterations
@@ -32,7 +30,6 @@ class Niches:
         self.satisfactory = satisfactory # satisfactory score
         self.calculate_mean = calculate_mean
         if calculate_mean:
-            # self.mean=0
             self.mean_param_std = 0
         self.stagnation_limit = stagnation_limit
         self.stagnation_diff = stagnation_diff
@@ -55,9 +52,6 @@ class Niches:
     def best_score(self) -> float:
         return self.get_best().fitness_score
 
-    def get_mean(self):
-        return self.mean
-
     def get_diversity(self):
         return self.mean_param_std
 
@@ -67,12 +61,10 @@ class Niches:
             migrators.append(np.random.choice(niche.pop, self.migrator_num, False)) # choose migrators
             [niche.pop.remove(migrator) for migrator in migrators[-1]] # remove migrators from pop of origin
         np.roll(migrators, 1) # rotate migrators clockwise
-        # migrators = list(migrators)
         # each migration group settles in the pop to the right, the last group settles in the first pop
         for i in range(len(migrators)):
             self.niches[i].pop += list(migrators[i])
             # recalculate carry-overs
-            # TODO: inefficient, look into it later
             self.niches[i].carry_over = HeapqIndividual(self.niches[i].num_carry_over)
             [self.niches[i].carry_over.push(ind) for ind in self.niches[i].pop]
             return
@@ -86,16 +78,10 @@ class Niches:
 
         for niche in self.niches:
             output.niches.append(next(niche))
-            # worst fitness score overall is the highest score (worst) among niches
-            if output.worst_fitness_score < output.niches[-1].worst_fitness_score:
-                output.worst_fitness_score = output.niches[-1].worst_fitness_score
             # best individual among all niches
             best_in_new_niche = output.niches[-1].get_best()
             if best_in_new_niche < output.best_individual:
                 output.best_individual = best_in_new_niche
-            # overall mean is the mean of every niche
-            # fitness_mean_sum += output.niches[-1].mean
-        # output.mean = fitness_mean_sum / len(output.niches)
         output.mean_param_std = np.mean([niche.mean_param_std for niche in output.niches])
 
     def __iter__(self):

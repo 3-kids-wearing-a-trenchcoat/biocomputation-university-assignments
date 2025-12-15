@@ -56,21 +56,16 @@ class Population:
         self.participants = tournament_participants # participants in each tournament
         self.num_carry_over = carry_over # number of the best candidates to carry over to next generation
         self.calculate_mean = calculate_mean
-        # self.mean = 0
         self.mean_param_std = 0
 
         # X must be of shape (t x s), where M is of size (g x s) and H is of size (g x t)
         ind_size = (Individual.H.shape[1]+1, Individual.M.shape[1]) # shape of candidate solution
-        # ind_size = (Individual.H.shape[1], Individual.M.shape[1]) # shape of candidate solution
         # the "bucket" of Individual objects that make up the population, generated randomly via normal distribution
         self.pop = [Individual(self.rng.normal(0, init_sigma, ind_size).astype(FTYPE),False)
                     for _ in range(pop_size)]
         # The best individuals in this pop which will be carried over to the next generation
-        # self.carry_over: list[Individual]|None = None
         self.carry_over: hqi = hqi(self.num_carry_over)
         [self.carry_over.push(ind) for ind in self.pop]
-        # worst fitness score in this population
-        self.worst_fitness_score = 0
 
     def tournament_selection(self, candidates:NDArray[Individual], exclude:Individual=None) -> Individual:
         """
@@ -104,7 +99,6 @@ class Population:
         Get a pair of parents selected via the tournament method
         :return: tuple of two Individual objects
         """
-        # TODO: reconsider efficiency if I have the time
         candidates = self.rng.choice(self.pop, self.participants, False) # first group of candidates
         parent1 = self.tournament_selection(candidates) # pick first winner
         candidates = self.rng.choice(self.pop, self.participants, False) # second group of candidates
@@ -120,8 +114,6 @@ class Population:
         output.pop = self.carry_over.list() # initialize output pop with this generation's carry-over
         output.carry_over = copy.deepcopy(self.carry_over) # start with this carry over and update as we generate kids
         output.worst_fitness_score = output.carry_over.get(0).fitness_score
-        if self.calculate_mean:
-            fitness_sum = sum([ind.fitness_score for ind in output.pop])
 
         # generate children
         while len(output.pop) < self.pop_size:
@@ -136,11 +128,7 @@ class Population:
                 output.worst_fitness_score = children[0].fitness_score
             if output.worst_fitness_score < children[1].fitness_score:
                 output.worst_fitness_score = children[1].fitness_score
-            # if self.calculate_mean:
-            #     # add to fitness_sum
-            #     fitness_sum += children[0].fitness_score + children[1].fitness_score
         if self.calculate_mean: # update mean if we calculate it
-            # output.mean = fitness_sum / output.pop_size
             param_std = np.std([ind.genotype for ind in output.pop], axis=0)
             output.mean_param_std = np.mean(param_std)
 
@@ -151,9 +139,6 @@ class Population:
 
     def best_score(self) -> float:
         return self.carry_over.get(-1).fitness_score
-
-    def get_mean(self):
-        return self.mean
 
     def get_diversity(self):
         return self.mean_param_std

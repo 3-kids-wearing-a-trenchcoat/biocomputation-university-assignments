@@ -1,7 +1,5 @@
-# from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
-# from Individual import FTYPE
 
 FTYPE = np.float64
 

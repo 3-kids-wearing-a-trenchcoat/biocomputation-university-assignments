@@ -1,5 +1,4 @@
 from __future__ import annotations
-import numpy as np
 from numpy.typing import NDArray
 from tqdm.auto import tqdm
 from Individual import Individual, FTYPE
@@ -47,24 +46,17 @@ class RNASeqDeconvolution:
                     dynamic_ncols=True, leave=tqdm_leave, position=tqdm_pos)
         for generation in pbar:
             self.best_history.append(generation.best_score())
-            # self.worst_history.append(generation.worst_fitness_score)
             if self.check_mean:
-                # self.mean_history.append(generation.get_mean())
                 self.diversity_history.append(generation.get_diversity())
                 pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
-                                     # f"worst score: {self.worst_history[-1]:.4f}, "
-                                     # f"mean score: {self.mean_history[-1]:.4f}, "
                                      f"diversity: {self.diversity_history[-1]:.4f}, "
                                      f"stagnant iterations: {generation.current_stagnant_iter}")
             else:
                 pbar.set_postfix_str(f"best score: {self.best_history[-1]:.4f}, "
-                                     # f"worst score: {self.worst_history[-1]:.4f}, "
                                      f"stagnant iterations: {generation.current_stagnant_iter}")
         self.pop = generation
         if print_stop_reason:
             print("stop reason: " + self.detect_stop_reason(generation))
-        # self.result = generation.get_pocket().get_phenotype()
-        # self.result_fitness_score = generation.get_pocket().get_fitness_score()
         self.result = generation.get_best().get_phenotype(True)
         self.result_fitness_score = generation.best_score()
 

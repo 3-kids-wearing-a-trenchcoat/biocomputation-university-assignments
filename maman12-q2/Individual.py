@@ -17,8 +17,6 @@ def ext_calc_phenotype(self_genotype, discard_unclassified: bool = True) -> NDAr
     """Compute the column-wise softmax of the genotype matrix, which is the phenotype."""
     # tiny epsilon added to denominator to avoid rare divisions by 0
     eps = np.finfo(FTYPE).tiny  # tiny epsilon added to denominator to avoid rare divisions by 0
-    # subtract column max from every element, reduces the likelihood of overflow without changing softmax
-    # genotype_shift = self_genotype - np.max(self_genotype, axis=0, keepdims=True)
     exp_g = np.exp(self_genotype)  # apply exp on every element (numerator)
     sum_exp = np.sum(exp_g, axis=0)  # sum columns (denominator)
     if discard_unclassified:
@@ -39,8 +37,6 @@ def ext_apply_mutation(genotype, rng, mut_prob, mut_std):
 @njit
 def ext_crossover(self_gen:NDArray, partner_gen:NDArray, rng:np.random.Generator) -> tuple[NDArray, NDArray]:
     # row-wise blending
-    # row_alpha = rng.uniform(0,1, (self_gen.shape[0], 1)) # choose alpha for each row
-    # alpha_1 = np.tile(row_alpha, self_gen.shape[1])
     alpha_1 = rng.uniform(0,1, (self_gen.shape[0], 1)) # choose alpha for each row
     alpha_2 = np.ones_like(alpha_1) - alpha_1
     # generate child genotypes via intermediate recombination
@@ -62,7 +58,6 @@ class Individual:
     M: NDArray[FTYPE] = None # number of sequences for gene i in sample j
     H: NDArray[FTYPE] = None # number of sequences for gene i in cell-type j
     L: NDArray[FTYPE] = None
-    TRUE: NDArray[FTYPE] = None
 
     @staticmethod
     def set_static_vars(rng:np.random.Generator, mut_prob:float, mut_standard_deviation:float, crossover_prob:float,
@@ -100,38 +95,19 @@ class Individual:
         Individual.L = Individual.M.sum(axis=0, keepdims=True)
         Individual.L = np.where(Individual.L == 0, np.finfo(FTYPE).tiny, Individual.L)
 
-        Individual.TRUE = TRUE
-
     @staticmethod
     def apply_mutation(genotype: NDArray[FTYPE]) -> NDArray[FTYPE]: # per-row mutation where only one element mutates
         """Apply mutation to the given genotype by adding to it a matrix of random values.
         Each value in genotype has a probability of _mut_prob to have a value added to it (mutation probability).
         Each value to be mutated has a random, normal (gaussian) distribution value added to it.
         The normal distribution has a mean of 0 and a standard deviation of _mut_standard_deviation."""
-        # rows, cols = genotype.shape
-        # row_mask = (Individual.rng.random((rows,)) < Individual._mut_prob).astype('bool')
-        # mutated_element = Individual.rng.integers(0, cols, rows) # pick random element for each row
-        # noise = np.zeros_like(genotype)
-        # noise[row_mask, mutated_element[row_mask]] = Individual.rng.normal(0, Individual._mut_standard_deviation, size=row_mask.sum())
-        # return genotype + noise
         return ext_apply_mutation(genotype, Individual.rng, Individual._mut_prob, Individual._mut_standard_deviation)
 
     def calc_phenotype(self, discard_unclassified:bool = True) -> NDArray[FTYPE]:
         """Compute the column-wise softmax of the genotype matrix, which is the phenotype."""
-        # # tiny epsilon added to denominator to avoid rare divisions by 0
-        # eps = np.finfo(FTYPE).tiny # tiny epsilon added to denominator to avoid rare divisions by 0
-        # # subtract column max from every element, reduces the likelihood of overflow without changing softmax
-        # genotype_shift = self.genotype - np.max(self.genotype, axis=0, keepdims=True)
-        # exp_g = np.exp(genotype_shift) # apply exp on every element (numerator)
-        # sum_exp = np.sum(exp_g, axis=0, keepdims=True) # sum columns (denominator)
-        # if discard_unclassified:
-        #     return exp_g[:-1] / (sum_exp + eps) # return without 'unclassified' row
-        # return exp_g / (sum_exp + eps) # return with 'unclassified' category
         return ext_calc_phenotype(self.genotype, discard_unclassified)
 
     def calc_fitness_score(self) -> FTYPE:
-        # mu = (Individual.H @ self.phenotype) * Individual.L
-        # return np.sum(np.square(Individual.M - mu))
         return ext_calc_fitness_score(Individual.H, self.phenotype,
                                       Individual.L, Individual.M)
 
@@ -172,18 +148,6 @@ class Individual:
         :param partner: Individual with which this Individual produces offsprings
         :return: two new genotypes (2D float matrices)
         """
-        # # generate two arithmetically symmetrical blending rate matrices (alpha) randomly in uniform distribution
-        # # alpha_1 = Individual.rng.uniform(0, 1, self.genotype.shape) # element-wise
-        # # row-wise blending
-        # row_alpha = Individual.rng.uniform(0,1, (self.genotype.shape[0], 1)) # choose alpha for each row
-        # # row_alpha = Individual.rng.uniform(0.4,0.61, (self.genotype.shape[0], 1)) # choose alpha for each row
-        # alpha_1 = np.tile(row_alpha, self.genotype.shape[1])
-        # alpha_2 = np.ones_like(alpha_1) - alpha_1
-        # # generate child genotypes via intermediate recombination
-        # child_1 = self.genotype + alpha_1 * (partner.genotype - self.genotype)
-        # child_2 = self.genotype + alpha_2 * (partner.genotype - self.genotype)
-        # # return both genotypes
-        # return child_1, child_2
         return ext_crossover(self.genotype, partner.genotype, Individual.rng)
 
     def breed(self, partner:Individual) -> tuple[Individual, Individual]:
