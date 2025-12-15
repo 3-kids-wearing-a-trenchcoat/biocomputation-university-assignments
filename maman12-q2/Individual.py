@@ -148,9 +148,8 @@ class Individual:
         else:
             self.genotype = genotype
         self.phenotype_with_unclassified = self.calc_phenotype(False)
-        # self.phenotype = self.calc_phenotype()
-        # self.phenotype = self.phenotype_with_unclassified[:-1]
-        self.phenotype = self.phenotype_with_unclassified
+        self.phenotype = self.phenotype_with_unclassified[:-1]
+        # self.phenotype = self.phenotype_with_unclassified
         self.fitness_score = self.calc_fitness_score()
 
     def get_genotype(self) -> NDArray[FTYPE]:

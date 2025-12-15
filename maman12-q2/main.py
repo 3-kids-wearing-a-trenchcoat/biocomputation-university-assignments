@@ -27,8 +27,8 @@ DEFAULT_PARAMS = {"rng_seed": 123,
                   "init_sigma": 2.5,
                   "tournament_participants": 2,
                   "carry_over": 10,
-                  "H_path": Path(__file__).parent / "matrices" / "gene_celltype_TPM_with_unclassified.tsv",
-                  # "H_path": Path(__file__).parent / "matrices" / "gene_celltype_TPM.tsv",
+                  # "H_path": Path(__file__).parent / "matrices" / "gene_celltype_TPM_with_unclassified.tsv",
+                  "H_path": Path(__file__).parent / "matrices" / "gene_celltype_TPM.tsv",
                   "M_path": Path(__file__).parent / "matrices" / "gene_sample_TPM.tsv",
                   "true_result_path": Path(__file__).parent / "matrices" / "sample_celltype_groundT_sorted_redacted_with_unclassified.tsv",
                   "niche_num": 2,
@@ -434,12 +434,12 @@ if __name__ == "__main__":
                                  "win_probability": 0.85,
                                  "init_sigma": 2.5,
                                  "carry_over": 10,
-                                 "max_iter": 1500,
+                                 "max_iter": 2000,
                                  "niche_num": 2,
                                  "migration_interval": 200,
                                  "migrator_num": 5,
                                  "use_marker_genes": True,
-                                 "top_n_marker_genes": 200,
+                                 "top_n_marker_genes": 110,
                                  "min_mean_marker_genes": 1e-6,
                                  "log_transform_marker_genes": True
                                  },
@@ -449,6 +449,6 @@ if __name__ == "__main__":
     # print(pd.DataFrame(phen))
     print(compare_to_true_results(phen))
 
-    # metrics = evaluate_deconvolution_solution(phen, TRUE, H, M, Individual.L,
-    #                                           "phen", 200, 1e-6)
+    metrics = evaluate_deconvolution_solution(phen[:-1], TRUE[:-1], Individual.H, Individual.M, Individual.L,
+                                              "phen", 110, 1e-6)
     # print("Overall X MAE:", metrics['mae_overall'])
