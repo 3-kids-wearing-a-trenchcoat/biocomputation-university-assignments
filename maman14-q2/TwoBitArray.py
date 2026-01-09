@@ -1,5 +1,5 @@
 from bitarray import bitarray
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, List
 
 class TwoBitArray:
     """Array of 2-bit elements, implemented using bitarray.
@@ -72,17 +72,31 @@ class TwoBitArray:
         self.left.append(true_val[0])
         self.right.append(true_val[1])
 
+    def extend(self, vals: Iterable) -> None:
+        """Recursively append values to the array using the append function"""
+        [self.append(item) for item in vals]
+
     def __len__(self):
         return len(self.left)
 
+    def get_by_mask(self, mask:bitarray):
+        if len(mask) != len(self.left):
+            raise ValueError("mask is not of the same length as the array")
+        output = TwoBitArray()
+        output.to_syntax, output.from_syntax = self.to_syntax, self.from_syntax
+        output.left, output.right = self.left[mask], self.right[mask]
+        return output
+
     def __getitem__(self, key) -> Tuple[int, int]|TwoBitArray:
-        if isinstance(key, slice):
+        if isinstance(key, slice):      # array slicing
             start, stop, step = key.indices(len(self))
             output = TwoBitArray()
             output.to_syntax, output.from_syntax = self.to_syntax, self.from_syntax
             output.left, output.right = self.left[start,stop,step], self.right[start,stop,step]
             return output
-        return self.left[key], self.right[key]
+        if isinstance(key, bitarray):   # by mask
+            return self.get_by_mask(key)
+        return self.left[key], self.right[key]  # by index
 
     def get(self, key):
         """Return the index at that key in its syntax form"""
@@ -108,5 +122,15 @@ class TwoBitArray:
     def __xor__(self, other: TwoBitArray) -> bitarray:
         """Define (self ^ other) to be shorthand for self.xor_mask(other)"""
         return self.xor_mask(other)
+
+    def copy(self):
+        output = TwoBitArray()
+        output.to_syntax, output.from_syntax = self.to_syntax, self.from_syntax
+        output.left, output.right = self.left.copy(), self.right.copy()
+        return output
+
+    def decode(self, start:int, stop:int) -> List:
+        output = [self.get(i) for i in range(start, stop)]
+        return output
 
     # TODO: convert to numpy boolean NDArray, maybe?
