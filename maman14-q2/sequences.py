@@ -8,22 +8,27 @@ defined here to find the range nucleotides that actually represents it.
 from __future__ import annotations
 from TwoBitArray import TwoBitArray
 from bitarray import bitarray
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, List
+from threading import RLock
 
 _nucleotide_syntax = ['T', 'G', 'C', 'A'] # 'T':=00, 'G':=01, 'C':=10, 'A':=11
 _seq = TwoBitArray(_nucleotide_syntax)    # The logical array in which all DNA sequences are stored
 _active = bitarray()                      # bitmap representing whether the sequence is deleted (equals 0)
+_lock = RLock()                           # Prevent race-conditions as a result of parallel writing
 
-def seq_append(input_seq: str) -> Tuple[int, int]:
+def seq_append(input_seq: Iterable) -> Tuple[int, int]:
     """
     Store a nucleotide sequence in memory and return its location
-    :param input_seq: string representing a nucleotide sequence, may only contain the characters T,G,C,A
+    :param input_seq: Iterable representing a nucleotide sequence, may only contain the characters T,G,C,A
     :return: (offset, length) Tuple, where offset is the index from which this newly added sequence is stored
              and length is the number of subsequent indexes that are part of this sequence
     """
+    _lock.acquire()
     offset = len(_seq)
     length = len(input_seq)
     _seq.extend(input_seq)
+    _active.extend([1 for _ in range(len(input_seq))])
+    _lock.release()
     return offset, length
 
 def get_seq() -> TwoBitArray:
@@ -32,9 +37,27 @@ def get_seq() -> TwoBitArray:
 
 def prune_inactive() -> None:
     global _seq, _active
+    _lock.acquire()
     _seq = _seq[_active]
     _active = bitarray(len(_seq))
     _active.setall(1)
+    _lock.release()
 
 def get(offset:int, length:int) -> TwoBitArray:
     return _seq[offset:length]
+
+def make_inactive(offset:int, length: int) -> None:
+    # locking may be unnecessary here
+    _lock.acquire()
+    _active[offset:length] = 0
+    _lock.release()
+
+def decode(offset:int, length:int) -> List[str]:
+    return _seq.decode(offset, length)
+
+def acquire_lock():
+    """Acquire sequences lock, should only be used outside of this model when reindexing"""
+    _lock.acquire()
+
+def release_lock():
+    _lock.release()
