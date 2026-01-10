@@ -145,11 +145,14 @@ class TwoBitArray:
         except ValueError: # ValueError is raised on length mismatch
             return False
 
-    def get_complement(self) -> TwoBitArray:
+    def invert(self) -> TwoBitArray:
         """Get the bitwise complement by flipping every bit"""
         output = self.copy()
         output.left.invert(), output.right.invert()
         return output
+
+    def __invert__(self) -> TwoBitArray:
+        return self.invert()
 
     def search(self, sub_array:TwoBitArray):
         """
@@ -159,12 +162,17 @@ class TwoBitArray:
         """
         left_search = self.left.search(sub_array.left)
         right_search = self.right.search(sub_array.right)
-        while True:
-            try:
-                x, y = next(left_search), next(right_search)
-            except StopIteration:
-                return
-            if x == y:
-                yield x
+        try:
+            a, b = next(left_search), next(right_search)
+            while True:
+                if a == b:
+                    yield a
+                    a, b = next(left_search), next(right_search)
+                elif a < b:
+                    a = next(left_search)
+                else:
+                    b = next(right_search)
+        except StopIteration:
+            return
 
     # TODO: convert to boolean NDArray, maybe?
