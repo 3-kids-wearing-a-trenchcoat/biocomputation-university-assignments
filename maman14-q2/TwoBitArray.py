@@ -133,4 +133,16 @@ class TwoBitArray:
         output = [self.get(i) for i in range(start, stop)]
         return output
 
+    def is_complement(self, other:TwoBitArray) -> bool:
+        """
+        Check if both arrays are element-wise complement to one another.
+        :param other: TwoBitArray
+        :return: True if for every index i, self[i] ^ other[i], otherwise False.
+                 Arrays of different lengths will always return False.
+        """
+        try:
+            return (self ^ other).all()
+        except ValueError: # ValueError is raised on length mismatch
+            return False
+
     # TODO: convert to numpy boolean NDArray, maybe?
