@@ -71,3 +71,22 @@ def reindex() -> NDArray[np.int32]:
     _lock.release()
 
     return old_to_new
+
+def get_dead_fraction() -> float:
+    """Get fraction of strand entries which are dead"""
+    return _active.count(0) / len(_active)
+
+def is_complement(strand_id_A:int, strand_id_B:int) -> bool:
+    """
+    Check if the two strands have element-wise complementary sequences.
+    A sequence is element-wise complementary iff for every i-th nucleotide, nucleotide i of strand A
+    is complementary (A <-> T or G <-> C) to nucleotide i of strand B.
+    Strands of different lengths are by definition never element-wise complementary.
+    :param strand_id_A: id of first strand
+    :param strand_id_B: id of second strand
+    :return: True if the two strands are complementary, otherwise False.
+    """
+    length_A, length_B = _length[strand_id_A], _length[strand_id_B]
+    if length_A != length_B:
+        return False
+    return sequences.is_complement(strand_id_A, strand_id_B, length_A)

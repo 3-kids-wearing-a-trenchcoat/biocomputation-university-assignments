@@ -61,3 +61,13 @@ def acquire_lock():
 
 def release_lock():
     _lock.release()
+
+def is_complement(offset_a:int, offset_b:int, length:int) -> bool:
+    """
+    Check if the two sequences specified by offset and length are element-wise complementary
+    :param offset_a: offset of first sequence
+    :param offset_b: offset of second sequence
+    :param length: length of both sequences (sequences of different lengths are by definition not element-wise complementary)
+    :return: True if the two sequences are element-wise complementary, otherwise False.
+    """
+    return _seq[offset_a:length].is_complement(_seq[offset_b:length])
