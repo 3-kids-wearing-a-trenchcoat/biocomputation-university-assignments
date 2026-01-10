@@ -90,3 +90,28 @@ def is_complement(strand_id_A:int, strand_id_B:int) -> bool:
     if length_A != length_B:
         return False
     return sequences.is_complement(strand_id_A, strand_id_B, length_A)
+
+def _find_seed_matches(id_a:int, id_b:int, seed_len:int) -> List[Tuple[int, int]]:
+    """
+    Find all starting points at which the two given strands can duplex-bind and return them.
+    A valid starting point is any 2-tuple (i,j) in which the nucleotide sub-sequences A[i:seed_len] and B[j:seed_len]
+    are complementary. This can be thought of as the "starting point" of a duplex bind between strands.
+    This function considers only complementarity and does not check whether a nucleotide is not already bound,
+    This check should be performed on the output of this function.
+    :param id_a: id of strand A
+    :param id_b: id of strand B
+    :param seed_len: Length of sequence to check at each point
+    :return: List of Tuples made up of two ints each.
+             The first int representing the start index of the matching sequence in strand A, and the second
+             int representing the start index of the matching sequence in strand B.
+    """
+    seq_a = sequences.get(_offset[id_a], _length[id_a])
+    seq_b = ~sequences.get(_offset[id_b], _length[id_b]) # seq_b is inverted as we're looking for complementarity
+    output = []
+    for j in range(len(seq_b) - seed_len + 1):           # for each possible start position for a seed_len-long sub-sequence of B
+        seed = seq_b[j:j+seed_len]
+        output.extend([i,j] for i in seq_a.search(seed)) # add all pairs of start indexes for A and B respectively where there's a match
+    return output
+
+# TODO: _extend_seed() -- extend seed we got from _find_seed_matches -- return start_A and start_B -- should probably calculate strength here too
+# TODO: (maybe) _extend_seeds() -- do _extend_seed() for every seed found
