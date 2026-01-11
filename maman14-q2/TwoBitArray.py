@@ -181,4 +181,12 @@ class TwoBitArray:
         self.left.extend(other.left)
         self.right.extend(other.right)
 
+    def merge(self, other: TwoBitArray) -> TwoBitArray:
+        """Get a new TwoBitArray by appending other to the end of self.
+        Identical to the 'extend' function, with the exception that merge returns a new
+        TwoBitArray rather than modify self"""
+        output = self.copy()
+        output.extend(other)
+        return output
+
     # TODO: convert to boolean NDArray, maybe?
