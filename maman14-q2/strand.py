@@ -113,5 +113,45 @@ def _find_seed_matches(id_a:int, id_b:int, seed_len:int) -> List[Tuple[int, int]
         output.extend([i,j] for i in seq_a.search(seed)) # add all pairs of start indexes for A and B respectively where there's a match
     return output
 
-# TODO: _extend_seed() -- extend seed we got from _find_seed_matches -- return start_A and start_B -- should probably calculate strength here too
-# TODO: (maybe) _extend_seeds() -- do _extend_seed() for every seed found
+def _extend_seed(id_a:int, nucleation_index_a:int, id_b:int, nucleation_index_b:int) -> Tuple[int, int, int, float]:
+    """
+    Extend a nucleation index on A and on B (as found in _find_seed_matches) into a duplex-binding range between
+    strands A and B and get the start indexes for A and B, the length of the bind and its strength.
+    :param id_a: id of strand A
+    :param nucleation_index_a: index of nucleation point on strand A
+    :param id_b: id of strand B
+    :param nucleation_index_b: index of nucleation point on strand B
+    :return: Tuple - (start index on strand A for the bind,
+                      start index on strand B for the bind,
+                      length,
+                      fraction of overall nucleotides bound (strength))
+    """
+    len_a, len_b = _length[id_a], _length[id_b]
+    # Bind starts from the start of the strand whose starting position is to the right of the other's starting position
+    start_shift = min(nucleation_index_a, nucleation_index_b)
+    start_a, start_b = nucleation_index_a - start_shift, nucleation_index_b - start_shift
+    # Bind length is equal to the distance between bind start and the nearer of A's end and B's end
+    length_a, length_b = len_a - start_a, len_b - start_b
+    length = min(length_a, length_b)
+    # bind strength is equal to fraction of all nucleotide pairs that are bound to a complementary nucleotide
+    bind_seq_a = sequences.get(_offset[id_a] + start_a, length)
+    bind_seq_b = sequences.get(_offset[id_b] + start_b, length)
+    comp = (bind_seq_a ^ bind_seq_b).count()  # number of complementary pairs, obviously every pair has 2 nucleotides
+    strength = (comp * 2) / (len_a + len_b)   # fraction of all nucleotides in both strands that are bound to a complementary
+    return start_a, start_b, length, strength
+
+
+def get_possible_binds(id_a:int, id_b:int, seed_len:int) -> List[Tuple[int, int, int, float]]:
+    """
+    Find all possible bindings between strand A and strand B
+    :param id_a: id of strand A
+    :param id_b: id of strand B
+    :param seed_len: length of sequence to check at each point (discard possible binds with fewer matches)
+    :return: List of possible bindings, each binding represented by a Tuple containing the following:
+                1. Bind start position for strand A (int)
+                2. Bind start position for strand B (int)
+                3. Bind length (int)
+                4. Bind strength - fraction of total nucleotides in both strands bound to a complementary nucleotide (float)
+    """
+    seeds = _find_seed_matches(id_a, id_b, seed_len)
+    return [_extend_seed(id_a, seed[0], id_b, seed[1]) for seed in seeds]
