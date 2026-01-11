@@ -27,12 +27,11 @@ def get_seq(strand_id:int, decoded:bool = False) -> TwoBitArray|List:
         return sequences.decode(offset, length)
     return sequences.get(offset, length)
 
-def new_strand(seq_str: str) -> int:
+def new_strand(input_seq: TwoBitArray) -> int:
     global _offset, _length, _active
     _lock.acquire()
-    offset, length = sequences.seq_append(seq_str)
+    offset, length = sequences.seq_append(input_seq)
     _offset, _length = np.append(_offset, offset), np.append(_length, length)
-    # _active = np.append(_active, True)
     _active.append(1)
     output_id = len(_offset) - 1
     _lock.release()
@@ -155,3 +154,35 @@ def get_possible_binds(id_a:int, id_b:int, seed_len:int) -> List[Tuple[int, int,
     """
     seeds = _find_seed_matches(id_a, id_b, seed_len)
     return [_extend_seed(id_a, seed[0], id_b, seed[1]) for seed in seeds]
+
+def merge_strands(id_a:int, id_b:int) -> int:
+    """
+    Merge two existing strands into one by appending the sequence of strand B to the end of strand A to create a new
+    strand C and (soft) deleting strands A and B.
+    :param id_a: id of strand A
+    :param id_b: id of strand B
+    :return: id of new merged strand
+    """
+    _lock.acquire()
+    seq_a, seq_b = get_seq(id_a), get_seq(id_b)
+    new_seq = seq_a.merge(seq_b)
+    _delete_strand(id_a), _delete_strand(id_b)
+    new_id = new_strand(new_seq)
+    _lock.release()
+    return new_id
+
+def split_strand(strand_id, split_index) -> Tuple[int, int]:
+    """
+    split a strand according to split_index and update data accordingly
+    :param strand_id: id of strand to split
+    :param split_index: Index according to which the strand is split.
+                        If split_index == i, will produce the sub-strands strand[0:i] and strand[i:len(strand)].
+    :return: IDs of the two new strands
+    """
+    _lock.acquire()
+    old_seq = get_seq(strand_id)
+    seq_a, seq_b = old_seq[0:split_index], old_seq[split_index:len(old_seq)]
+    _delete_strand(strand_id)
+    id_a, id_b = new_strand(seq_a), new_strand(seq_b)
+    _lock.release()
+    return id_a, id_b
