@@ -72,9 +72,9 @@ class TwoBitArray:
         self.left.append(true_val[0])
         self.right.append(true_val[1])
 
-    def extend(self, vals: Iterable) -> None:
-        """Recursively append values to the array using the append function"""
-        [self.append(item) for item in vals]
+    # def extend(self, vals: Iterable) -> None:
+    #     """Recursively append values to the array using the append function"""
+    #     [self.append(item) for item in vals]
 
     def __len__(self):
         return len(self.left)
@@ -174,5 +174,11 @@ class TwoBitArray:
                     b = next(right_search)
         except StopIteration:
             return
+
+    def extend(self, other: TwoBitArray):
+        """append the other TwoBitArray to the end of this TwoBitArray.
+        self's syntax is retained and other's syntax has no influence on the extended array"""
+        self.left.extend(other.left)
+        self.right.extend(other.right)
 
     # TODO: convert to boolean NDArray, maybe?
