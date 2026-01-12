@@ -213,5 +213,13 @@ def filter_by_mask(mask:NDArray[np.bool]) -> None:
     _active &= bitarray(mask.tolist())
     _lock.release()
 
-
-# TODO: implement magnetic strands for magnetic separation
+def get_pattern_mask(pattern:TwoBitArray) -> NDArray[np.bool_]:
+    """
+    Get a mask for all strands which contain the input pattern
+    :param pattern: TwoBitArray object representing a sequence in a strand
+    :return: boolean numpy array where cell `i` is 'True' iff strand `i` contains the input pattern
+    """
+    # TODO: May need to add Stochasticity here
+    output = [(pattern in sequences.get(offset, length)) if active else False
+              for offset, length, active in zip(_offset, _length, _active)]
+    return np.asarray(output, dtype=bool)
