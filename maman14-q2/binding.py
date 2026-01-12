@@ -18,9 +18,8 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from threading import RLock
+from numba import njit
 import strand
-from TwoBitArray import TwoBitArray
-from bitarray import bitarray
 
 # constants
 # MIN_OVERLAP:int = 3
@@ -71,10 +70,11 @@ def add_bind(id_a:int, start_a:int, id_b:int, start_b:int, length:int, strength:
     :param strength: binding strength
     :return: id of new binding
     """
+    global _A_id, _B_id, _active
     _lock.acquire()
     new_id = len(_A_id)
-    np.append(_A_id, id_a), np.append(_B_id, id_b)
-    np.append(_active, True)
+    _A_id, _B_id = np.append(_A_id, id_a), np.append(_B_id, id_b)
+    _active = np.append(_active, True)
     _lock.release()
     return new_id
 
@@ -97,7 +97,14 @@ def reindex() -> None:
     _lock.release()
 
 
-
 # TODO: get bind (should think about what it actually returns)
+# TODO: added @njit wherever possible (the functions here are mostly numpy stuff, this could work)
 
-# TODO:
+# TODO: Bind two given strands at a random configuration (weighted towards stronger connections) (maybe this isn't random???)
+# TODO: Bind a given strand to some other randomly selected strand (based on the function above)
+# TODO: Choose a random strand to bind to stochastically (based on the function above)
+# TODO: Bulk bind at random (based on the function above)
+# TODO: bulk unravel binds at random, as a function of global temperature and per-bind strength
+# TODO: Bulk annealing (stochastic)
+# TODO: Implement restriction enzymes
+# TODO: Magnetic separation
