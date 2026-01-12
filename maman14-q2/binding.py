@@ -18,12 +18,18 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from threading import RLock
-from numba import njit
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Tuple, Iterable, cast
 import strand
+from external_njit_functions import choose_binding_by_strength
+from LazyLock import LazyLock
+from functools import partial
+import random
 
 # constants
 # MIN_OVERLAP:int = 3
 SEED_LEN = 6
+THREADS = 8     # maximum number of threads running concurrently when manually parallelizing work
 
 # binding data
 _A_id = np.empty(0, dtype=np.uint32)
@@ -100,10 +106,64 @@ def reindex() -> None:
 # TODO: get bind (should think about what it actually returns)
 # TODO: added @njit wherever possible (the functions here are mostly numpy stuff, this could work)
 
-# TODO: Bind two given strands at a random configuration (weighted towards stronger connections) (maybe this isn't random???)
-# TODO: Bind a given strand to some other randomly selected strand (based on the function above)
-# TODO: Choose a random strand to bind to stochastically (based on the function above)
-# TODO: Bulk bind at random (based on the function above)
+def _choose_binding(id_a:int, id_b:int) -> Tuple[int, int, int, float]|None:
+    """
+    Get a possible binding for strands A and B.
+    This binding is chosen randomly, with probabilities weighted by binding strength.
+    :param id_a: id of strand A
+    :param id_b: is of strand B
+    :return: If no possible binding exists, returns None.
+             Otherwise, return a tuple made up of the following values in order:
+             1. Bind start position for strand A (int)
+             2. Bind start position for strand B (int)
+             3. Bind length (int)
+             4. Bind strength - fraction of total nucleotides in both strands bound to a complementary nucleotide (float)
+    """
+    # generate candidate bindings
+    candidates:List[Tuple[int, int, int, float]] = strand.get_possible_binds(id_a, id_b, SEED_LEN)
+    if not candidates:
+        return None         # if candidates is empty, no bindings are possible, stop here and return 'None'
+    return choose_binding_by_strength(candidates)
+
+def _validate_bind(strand_locks: LazyLock, id_a:int, start_a:int, id_b:int, start_b:int, length:int) -> bool:
+    # TODO: implement
+
+def bulk_bind(repetitions:int=10) -> None:
+    """
+    Randomly bind strands to one another.
+    This function mimics (or should, at least) the natural binding behavior of DNA strands.
+    At each iteration, only some of the strands will form new bonds
+    :param repetitions: number of times to repeat this process
+    """
+    for rep in range(repetitions):  # repeat the bulk bind process `repetitions` times
+        # list of strands that will choose a partner (initialized to active ones)
+        candidates = np.nonzero(_active)[0].astype(np.uint32)
+        n = candidates.size
+        if n < 2:   # if n == 0 or n == 1, no further bindings are possible
+            return
+        # each candidate chooses a *different* candidate at random, using the vectorized shift trick
+        r = np.random.randint(0, n - 1, size=n) # generate random integers from range [0, n-2]
+        # convert each r into an index by skipping one spot when r >= i
+        i = np.arange(n)
+        idx = r + (r >= i)
+        # convert random idx choices into a random value from candidates, importantly, one that isn't the same strand.
+        choices = candidates[idx].astype(candidates.dtype)
+
+        # For each candidate-choice pair, pick a binding at random weighted by strength
+        with ThreadPoolExecutor(max_workers=THREADS) as ex:
+            binds: List[Tuple[int, int, int, float]] = list(ex.map(_choose_binding, candidates, choices))
+        # For each pair and their chosen binding, check if the binding area in either strand is not already bound
+        # If it is, that binding is discarded
+        strand_locks = LazyLock()                                   # per-strand locks
+        f = partial(_validate_bind, strand_locks=strand_locks)      # map strand_locks to _validate_bind
+        start_a, start_b, bind_length, strength = zip(*binds)
+        with ThreadPoolExecutor(max_workers=THREADS) as ex:
+            bind_is_valid =list(ex.map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
+        # add all found bindings that are possible
+        # TODO: THIS IMPLEMENTATION IS ABSOLUTELY DISGUSTING, parallelize it. (probably by using LazyLock in all functions somehow)
+        [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
+         for i in range(len(start_a)) if bind_is_valid[i]]
+
 # TODO: bulk unravel binds at random, as a function of global temperature and per-bind strength
 # TODO: Bulk annealing (stochastic)
 # TODO: Implement restriction enzymes
