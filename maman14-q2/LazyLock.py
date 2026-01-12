@@ -7,9 +7,9 @@ class LazyLock:
     Locks are allocated on-demand when their key is first called.
     Once created, a lock is never destroyed. to clear it from memory, the LazyLock object must be destroyed."""
     def __init__(self):
-        self._dict_lock = Lock()   # global lock on modification of the lock dict
-        self._locks: Dict[int, Lock] = dict()        # key is the id of the lock and its value is 'True' if it's locked
-                                    # or 'False' otherwise
+        self._dict_lock = Lock()                # global lock on the _locks dict
+        self._locks: Dict[int, Lock] = dict()   # key is the id of the lock and its value is 'True' if it's locked
+                                                # or 'False' otherwise
 
     def _ensure(self, key) -> None:
         """Ensure the actual lock exists. If not, create it."""
