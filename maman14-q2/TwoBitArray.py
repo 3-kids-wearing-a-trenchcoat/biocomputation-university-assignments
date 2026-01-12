@@ -175,6 +175,19 @@ class TwoBitArray:
         except StopIteration:
             return
 
+    def __contains__(self, sequence:TwoBitArray) -> bool:
+        """
+        Check if the given sequence is contained in this array
+        :param sequence: TwoBitArray representing the requested sequence
+        :return: 'True' if `sequence` is a continuous sub-array of this TwoBitArray, otherwise 'False'
+        """
+        try:
+            # search generator did not immediately hit StopIteration, meaning the sequence exists
+            next(self.search(sequence))
+            return True
+        except StopIteration:
+            return False
+
     def extend(self, other: TwoBitArray):
         """append the other TwoBitArray to the end of this TwoBitArray.
         self's syntax is retained and other's syntax has no influence on the extended array"""
