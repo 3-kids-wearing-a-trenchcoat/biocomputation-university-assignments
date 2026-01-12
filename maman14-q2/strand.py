@@ -186,3 +186,32 @@ def split_strand(strand_id, split_index) -> Tuple[int, int]:
     id_a, id_b = new_strand(seq_a), new_strand(seq_b)
     _lock.release()
     return id_a, id_b
+
+def get_length_mask(length:int) -> NDArray[np.bool]:
+    """
+    Get a mask showing the indexes of all active strands of the given length
+    :param length: requested length
+    :return: boolean NDArray where cell i is 'True' iff strand i is active and if of length 'length'
+    """
+    is_active = np.fromiter(_active, dtype=np.bool)
+    return is_active & (_length == length)
+
+def filter_by_mask(mask:NDArray[np.bool]) -> None:
+    """
+    (soft) Delete all strands in the data according to the input mask.
+    If cell `i` in the input mask is 'False', strand `i` will be deleted.
+    :param mask: boolean numpy array
+    """
+    global _active, _offset, _length
+    _lock.acquire()
+    np_active = np.fromiter(_active, dtype=np.bool)
+    change_mask = (not mask) & np_active    # active strands to make inactive
+    # make sequences inactive in the sequences module
+    for offset, length in zip(_offset[change_mask], _length[change_mask]):
+        sequences.make_inactive(offset, length)
+    # make strands inactive in this module
+    _active &= bitarray(mask.tolist())
+    _lock.release()
+
+
+# TODO: implement magnetic strands for magnetic separation
