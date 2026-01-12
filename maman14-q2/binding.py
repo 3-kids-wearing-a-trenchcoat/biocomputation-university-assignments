@@ -126,7 +126,16 @@ def _choose_binding(id_a:int, id_b:int) -> Tuple[int, int, int, float]|None:
     return choose_binding_by_strength(candidates)
 
 def _validate_bind(strand_locks: LazyLock, id_a:int, start_a:int, id_b:int, start_b:int, length:int) -> bool:
-    # TODO: implement
+    if id_a < id_b:
+        first_lock, second_lock = strand_locks[id_a], strand_locks[id_b]
+    else:
+        first_lock, second_lock = strand_locks[id_b], strand_locks[id_a]
+    first_lock.acquire()
+    second_lock.acquire()
+    conflict = (not is_bound_at(id_a, start_a, length)) and (not is_bound_at(id_b, start_b, length))
+    second_lock.release()
+    first_lock.release()
+    return conflict
 
 def bulk_bind(repetitions:int=10) -> None:
     """
