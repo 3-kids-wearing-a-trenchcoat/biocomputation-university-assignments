@@ -44,7 +44,7 @@ def _delete_strand(strand_id: int) -> None:
     sequences.make_inactive(_offset[strand_id], _length[strand_id])
     _lock.release()
 
-def reindex() -> NDArray[np.int32]:
+def reindex() -> NDArray[np.int64]:
     """
     Compactify data by removing all inactive strands.
     This function works under the assumption that all inactive strands are not bound to any other strand
