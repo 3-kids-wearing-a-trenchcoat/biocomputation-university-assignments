@@ -18,6 +18,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from threading import RLock
+from numba import njit
 # from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
 from typing import List, Tuple, Iterable, cast
@@ -199,11 +200,107 @@ def bulk_bind(repetitions:int=10) -> None:
         [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
          for i in range(len(start_a)) if bind_is_valid[i]] # TODO: BAD AND SLOW
 
-# TODO: get bind (should think about what it actually returns)
+@njit
+def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[np.uint32], NDArray[np.uint8],
+                                                                                                NDArray[np.uint8]]:
+    """
+    Get all strands bound to the input strand
+    :param host_id: id of the host strand ("host" being the strand all the output strands are bound to)
+    :param sort_by_start: Whether to sort the output arrays by start position
+    :return: Tuple of 3 numpy arrays, they are (in order)
+             1. array of IDs of strands bound to the host (np.uint32)
+             2. array of binding start position relative to host (np.uint8)
+             3. array of binding lengths (np.uint8)
+    """
+    # TODO: It may be smart to instead have some kind of hash map instead of recreate this at every annealing
+    host_id_in_A = (_A_id == host_id)
+    host_id_in_B = (_B_id == host_id)
+
+    bound_ids1, bound_ids2 = _B_id[host_id_in_A], _A_id[host_id_in_B]
+    bound_ids = np.concatenate((bound_ids1, bound_ids2))
+    bind_start1, bind_start2 = _A_start[host_id_in_A], _B_start[host_id_in_B]
+    bind_start = np.concatenate((bind_start1, bind_start2))
+    length = _length[host_id_in_A | host_id_in_B]
+
+    if sort_by_start:
+        start_sorted_indexes = np.argsort(bind_start)
+        bound_ids, bind_start, length = (bound_ids[start_sorted_indexes], bind_start[start_sorted_indexes],
+                                         length[start_sorted_indexes])
+
+    return bound_ids, bind_start, length
+
+@njit
+def _keep_only_unique(pairs: NDArray, hosts: NDArray|None = None) -> NDArray|Tuple[NDArray, NDArray]:
+    """
+    Given a numpy array of shape (N,2) (effectively an array of tuples of size 2), remove from the array
+    all tuples which contain a value that appeared in a previous tuple and return it.
+    """
+    if pairs.shape[1] != 2:
+        raise ValueError("`pairs` must be an (N,2) shaped NDArray")
+    N = pairs.shape[0]      # number of pairs
+    flat = pairs.ravel()    # flatten pairs
+    # unique_vals is a list of the unique values found
+    # first_flat_idx matches - for every cell i in flat - the index in unique_vals containing its value
+    unique_vals, first_flat_idx = np.unique(flat, return_index=True)
+    first_row_of_unique = first_flat_idx // 2   # row of first appearance
+
+    # map each flat value to index in unique_vals
+    idx_into_unique = np.searchsorted(unique_vals, flat)
+    # get for each flat position the row of first instance
+    first_row_flat = first_row_of_unique[idx_into_unique]   # length 2*N
+    # reshape back to (N,2) and require both elements' first_row == current_row
+    first_row_pairs = first_row_flat.reshape(N,2)
+    row_indices = np.arange(N)[:,None]
+    keep_mask = np.all(first_row_pairs == row_indices, axis=1)  # shape (N,)
+
+    if hosts is None:
+        return pairs[keep_mask]
+    return pairs[keep_mask], hosts[keep_mask]
+
+def _merge_strands(id_a:int, id_b:int, host_id:int) -> None:
+    """
+    Unite strand A and strand B by appending strand B to strand A.
+    Will update the strand data as well as the binding data.
+    :param id_a: id of strand A
+    :param id_b: id of strand B, which will be appended to the end of strand A
+    :param host_id: id of host strand. The host strand is the strand to which A and B are connected in such a way
+                    that they can be merged.
+    """
+    # TODO: If this were part of a parallelized process, this should use locks of some kind.
+    new_id = strand.merge_strands(id_a, id_b)       # create merged strand and delete the two input strands
+    # create masks for which rows reference id_a / id_b on each side (excluding inactive binds)
+    a_in_A = (_A_id == id_a) & _active
+    a_in_B = (_B_id == id_a) & _active
+    b_in_A = (_A_id == id_b) & _active
+    b_in_B = (_B_id == id_b) & _active
+    # exclude host bind from the above (this will be handled later)
+    a_in_A[host_id], a_in_B[host_id], b_in_A[host_id], b_in_B[host_id] = False
+    # TODO: continue
 
 # TODO: Bulk annealing (stochastic)
 def bulk_anneal() -> None:
     """Anneal all neighboring strands that are bound to the same third strand with a small probability of failure."""
+    # get ids, start position (relative to host) and bind lengths each strand bound to host
+    bound_ids, bind_start = np.array([], dtype=np.uint32), np.array([], dtype=np.uint8)
+    length, hosts = np.array([], dtype=np.uint8), np.array([], dtype=np.uint32)
+    for host_id in strand.get_living_ids():
+        # bound_ids, bind_start, length = get_bound_strands(host_id)
+        func_output = get_bound_strands(host_id)
+        if not func_output[0]:  # if host has no bindings
+            continue            # skip
+        bound_ids = np.append(bound_ids, func_output[0])
+        bind_start = np.append(bind_start, func_output[1])
+        length = np.append(length, func_output[2])
+        hosts = np.append(hosts, np.full(bound_ids.size, host_id))
+    # Candidates are those whose end position is immediately before the another's start position
+    candidate_mask = (bind_start[:-1] + length[:-1]) == bind_start[1:]
+    candidates = np.column_stack((bound_ids[:-1][candidate_mask], bound_ids[1:][candidate_mask]))
+    # Filter the candidates list so that no value in any pair appears in an earlier pair.
+    # This is to avoid having to concatenate anneals. that is, new strands produced in this run of bulk_anneal
+    # will not merge with any other strand during this run.
+    candidates, host = _keep_only_unique(candidates, hosts)
+    # TODO: the following section could probably be parallelized
+    [_merge_strands(pair[0], pair[1], host) for pair, host in zip(candidates, host)]
 
 
 # TODO: bulk unravel binds at random, as a function of global temperature and per-bind strength
