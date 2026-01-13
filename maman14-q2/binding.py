@@ -18,10 +18,11 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from threading import RLock
-from concurrent.futures import ThreadPoolExecutor
+# from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from typing import List, Tuple, Iterable, cast
 import strand
-from external_njit_functions import choose_binding_by_strength
+# from external_njit_functions import choose_binding_by_strength
 from LazyLock import LazyLock
 from functools import partial
 import random
@@ -30,6 +31,9 @@ import random
 # MIN_OVERLAP:int = 3
 SEED_LEN = 6
 THREADS = 8     # maximum number of threads running concurrently when manually parallelizing work
+ANNEALING_FAILURE_PROB = 1e-5   # probability that two strands wouldn't anneal despite being neighbors
+rng = np.random.default_rng()
+FLOAT_DTYPE = np.float32
 
 # binding data
 _A_id = np.empty(0, dtype=np.uint32)
@@ -89,22 +93,26 @@ def delete_bind(bind_id:int) -> None:
     _active[bind_id] = False
     _lock.release()
 
-def reindex() -> None:
-    # TODO: I THINK there's no need to inform anything of the changes in ID, if I'm wrong I need to return a conversion array a la strand's reindex
+def reindex(new_strand_ids:NDArray[np.int64]|None = None) -> None:
     """
     Compactify data by removing all inactive strands
-    :return: None
+    :param new_strand_ids: Numpy array produced by strand's reindex. If this variable is provided, strand IDs
+    are updated to the new values after the binding database is compressed.
+    Otherwise, the binding database is simply compressed by deleting all inactive entries.
     """
     global _A_id, _B_id, _A_start, _B_start, _length, _active, _strength
     _lock.acquire()
+    # TODO: haven't decided if I need to lock strand's lock here, or if locks are even necessary at all in retrospect
     _A_id, _B_id, _A_start, _B_start, _length, _strength = (_A_id[_active], _B_id[_active], _A_start[_active],
                                                             _B_start[_active], _length[_active], _strength[_active])
     _active = np.ones(len(_A_id), dtype=np.bool)
+
+    if new_strand_ids is not None:                  # update strand IDs
+        for i in range(len(_A_id)):                 # for every entry
+            _A_id[i] = new_strand_ids[_A_id[i]]     # change _A_id values according to new_strand_ids
+            _B_id[i] = new_strand_ids[_B_id[i]]     # change _B_id values according to new strand_ids
+
     _lock.release()
-
-
-# TODO: get bind (should think about what it actually returns)
-# TODO: added @njit wherever possible (the functions here are mostly numpy stuff, this could work)
 
 def _choose_binding(id_a:int, id_b:int) -> Tuple[int, int, int, float]|None:
     """
@@ -123,19 +131,36 @@ def _choose_binding(id_a:int, id_b:int) -> Tuple[int, int, int, float]|None:
     candidates:List[Tuple[int, int, int, float]] = strand.get_possible_binds(id_a, id_b, SEED_LEN)
     if not candidates:
         return None         # if candidates is empty, no bindings are possible, stop here and return 'None'
-    return choose_binding_by_strength(candidates)
+    # Normalize strength to be used as probability
+    probs = np.asarray([entry[3] for entry in candidates], dtype=FLOAT_DTYPE)
+    total = probs.sum()
+    # TODO: If I wanted to apply some probability function like strength**2, this would be the place
+    probs = probs / total
+    chosen = int(rng.choice(len(candidates), p=probs))
+    return candidates[chosen]
 
-def _validate_bind(strand_locks: LazyLock, id_a:int, start_a:int, id_b:int, start_b:int, length:int) -> bool:
-    if id_a < id_b:
-        first_lock, second_lock = strand_locks[id_a], strand_locks[id_b]
-    else:
-        first_lock, second_lock = strand_locks[id_b], strand_locks[id_a]
-    first_lock.acquire()
-    second_lock.acquire()
-    conflict = (not is_bound_at(id_a, start_a, length)) and (not is_bound_at(id_b, start_b, length))
-    second_lock.release()
-    first_lock.release()
-    return conflict
+
+# def _validate_bind(strand_locks: LazyLock, id_a:int, start_a:int, id_b:int, start_b:int, length:int) -> bool:
+#     if id_a < id_b:
+#         first_lock, second_lock = strand_locks[id_a], strand_locks[id_b]
+#     else:
+#         first_lock, second_lock = strand_locks[id_b], strand_locks[id_a]
+#     first_lock.acquire()
+#     second_lock.acquire()
+#     conflict = (not is_bound_at(id_a, start_a, length)) and (not is_bound_at(id_b, start_b, length))
+#     second_lock.release()
+#     first_lock.release()
+#     return conflict
+
+def _validate_bind(id_a:int, start_a:int, id_b:int, start_b:int, length:int) -> bool:
+    # This function only reads, and modifications only happen after all _validate_bind are done, so no locks needed here
+    # check if strand A or strand B are already bound at their intended binding span
+    if is_bound_at(id_a, start_a, length) or is_bound_at(id_b, start_b, length):
+        return False
+    # check if A and B are already bound to one another at any point
+    if ((_A_id == id_a & _B_id == id_b) | (_A_id == id_b & _B_id == id_a)).any():
+        return False
+    return True
 
 def bulk_bind(repetitions:int=10) -> None:
     """
@@ -159,21 +184,31 @@ def bulk_bind(repetitions:int=10) -> None:
         choices = candidates[idx].astype(candidates.dtype)
 
         # For each candidate-choice pair, pick a binding at random weighted by strength
-        with ThreadPoolExecutor(max_workers=THREADS) as ex:
+        # with ThreadPoolExecutor(max_workers=THREADS) as ex:
+        with ProcessPoolExecutor(max_workers=THREADS) as ex:
             binds: List[Tuple[int, int, int, float]] = list(ex.map(_choose_binding, candidates, choices))
         # For each pair and their chosen binding, check if the binding area in either strand is not already bound
         # If it is, that binding is discarded
         strand_locks = LazyLock()                                   # per-strand locks
-        f = partial(_validate_bind, strand_locks=strand_locks)      # map strand_locks to _validate_bind
+        # f = partial(_validate_bind, strand_locks=strand_locks)      # map strand_locks to _validate_bind
         start_a, start_b, bind_length, strength = zip(*binds)
-        with ThreadPoolExecutor(max_workers=THREADS) as ex:
+        # with ThreadPoolExecutor(max_workers=THREADS) as ex:
+        with ProcessPoolExecutor(max_workers=THREADS) as ex:
             bind_is_valid =list(ex.map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
         # add all found bindings that are possible
-        # TODO: THIS IMPLEMENTATION IS ABSOLUTELY DISGUSTING, parallelize it. (probably by using LazyLock in all functions somehow)
         [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
-         for i in range(len(start_a)) if bind_is_valid[i]]
+         for i in range(len(start_a)) if bind_is_valid[i]] # TODO: BAD AND SLOW
+
+# TODO: get bind (should think about what it actually returns)
+
+# TODO: Bulk annealing (stochastic)
+def bulk_anneal() -> None:
+    """Anneal all neighboring strands that are bound to the same third strand with a small probability of failure."""
+
 
 # TODO: bulk unravel binds at random, as a function of global temperature and per-bind strength
-# TODO: Bulk annealing (stochastic)
 # TODO: Implement restriction enzymes
 # TODO: Magnetic separation
+
+# TODO: Multithreading takes more work than I expected, this is a LOWER PRIORITY to the rest of the project
+# TODO: added @njit wherever possible (the functions here are mostly numpy stuff, this could work)
