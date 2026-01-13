@@ -223,3 +223,10 @@ def get_pattern_mask(pattern:TwoBitArray) -> NDArray[np.bool_]:
     output = [(pattern in sequences.get(offset, length)) if active else False
               for offset, length, active in zip(_offset, _length, _active)]
     return np.asarray(output, dtype=bool)
+
+def get_living_ids() -> NDArray[np.uint32]:
+    """
+    Get a numpy array of living strands' id values
+    """
+    # equivalent to np.nonzero for a numpy boolean array
+    return np.fromiter(_active.search(1), dtype=np.uint32)
