@@ -69,7 +69,7 @@ def is_bound_at(strand_id:int, bind_start:int, bind_length:int) -> bool:
              (start_in_B <= bind_start & bind_start <= end_in_B).any() or
              (start_in_B <= bind_end   & bind_end <= end_in_B).any())
 
-def add_bind(id_a:int, start_a:int, id_b:int, start_b:int, length:int, strength:float) -> int:
+def add_bind(id_a:int, start_a:int, id_b:int, start_b:int, length:int, strength:float|None=None) -> int:
     """
     Create a new duplex binding.
     THIS FUNCTION DOES NOT CHECK FOR OVERLAP WITH ANY EXISTING BINDING
@@ -78,14 +78,25 @@ def add_bind(id_a:int, start_a:int, id_b:int, start_b:int, length:int, strength:
     :param id_b: id of strand B
     :param start_b: starting bind index at strand B
     :param length: binding length
-    :param strength: binding strength
+    :param strength: optional - binding strength. If not given, will be calculated.
     :return: id of new binding
     """
-    global _A_id, _B_id, _active
+    global _A_id, _B_id, _A_start, _B_start, _length, _active, _strength
+    # If strength isn't given, calculate it
+    if strength is None:
+        # TODO: If I were to change strength from fraction of total nucleotides that are bound, I need to change it here too
+        seq_a, seq_b = strand.get_seq(id_a), strand.get_seq(id_b)
+        bind_seq_a, bind_seq_b = seq_a[start_a: start_a + length], seq_b[start_b: start_b + length]
+        comp = (bind_seq_a ^ bind_seq_b).count()
+        strength = comp / (len(seq_a) + len(seq_b))
+
     _lock.acquire()
     new_id = len(_A_id)
     _A_id, _B_id = np.append(_A_id, id_a), np.append(_B_id, id_b)
+    _A_start, _B_start = np.append(_A_start, start_a), np.append(_B_start, start_b)
+    _length = np.append(_length, length)
     _active = np.append(_active, True)
+    _strength = np.append(_strength, strength)
     _lock.release()
     return new_id
 
@@ -273,9 +284,14 @@ def _merge_strands(id_a:int, id_b:int, host_id:int) -> None:
     a_in_B = (_B_id == id_a) & _active
     b_in_A = (_A_id == id_b) & _active
     b_in_B = (_B_id == id_b) & _active
-    # exclude host bind from the above (this will be handled later)
-    a_in_A[host_id], a_in_B[host_id], b_in_A[host_id], b_in_B[host_id] = False
-    # TODO: continue
+    # find and exclude host bind from the above (this will be explicitly handled now)
+    host_bind_mask = ((a_in_A | b_in_A) & (_B_id == host_id)) | ((a_in_B | b_in_B) & (_A_id == host_id))
+    assert np.count_nonzero(host_bind_mask) == 2    # sanity check, should be host bound to a and host bound to b, no more
+    binds_with_host = np.nonzero(host_bind_mask)[0]    # get indexes of host bind
+    a_in_A[binds_with_host], a_in_B[binds_with_host], b_in_A[binds_with_host], b_in_B[binds_with_host] = False
+    _active[binds_with_host[0]], _active[binds_with_host[1]] = 0, 0 # delete binds featuring host
+
+    
 
 # TODO: Bulk annealing (stochastic)
 def bulk_anneal() -> None:
