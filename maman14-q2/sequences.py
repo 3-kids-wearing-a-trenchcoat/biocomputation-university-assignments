@@ -52,6 +52,12 @@ def make_inactive(offset:int, length: int) -> None:
     _active[offset:length] = 0
     _lock.release()
 
+def bulk_make_inactive(offset:List[int], length:List[int]) -> None:
+    _lock.acquire()
+    for o, l in zip(offset, length):
+        _active[o:l] = 0
+    _lock.release()
+
 def decode(offset:int, length:int) -> List[str]:
     return _seq.decode(offset, length)
 
@@ -71,3 +77,7 @@ def is_complement(offset_a:int, offset_b:int, length:int) -> bool:
     :return: True if the two sequences are element-wise complementary, otherwise False.
     """
     return _seq[offset_a:length].is_complement(_seq[offset_b:length])
+
+def get_dead_fraction() -> float:
+    """Get fraction of strand entries which are dead"""
+    return _active.count(0) / len(_active)

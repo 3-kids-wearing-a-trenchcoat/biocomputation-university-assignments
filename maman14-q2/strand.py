@@ -44,6 +44,18 @@ def _delete_strand(strand_id: int) -> None:
     sequences.make_inactive(_offset[strand_id], _length[strand_id])
     _lock.release()
 
+def bulk_delete(ids: NDArray[np.uint32]) -> None:
+    """Delete all strands in the input array.
+    Strands that are already deleted will not be affected."""
+    global _active
+    _lock.acquire()
+    mask = np.ones(len(_active), dtype=np.bool)
+    mask[ids] = False
+    mask = bitarray(mask.tolist())
+    _active &= mask
+    sequences.bulk_make_inactive(_offset[ids].tolist(), _length[ids].tolist())
+    _lock.release()
+
 def reindex() -> NDArray[np.int64]:
     """
     Compactify data by removing all inactive strands.
@@ -213,23 +225,24 @@ def filter_by_mask(mask:NDArray[np.bool]) -> None:
     _active &= bitarray(mask.tolist())
     _lock.release()
 
-def get_pattern_mask(pattern:TwoBitArray) -> NDArray[np.bool_]:
+def get_pattern_mask(pattern:TwoBitArray) -> NDArray[np.bool]:
     """
     Get a mask for all strands which contain the input pattern
     :param pattern: TwoBitArray object representing a sequence in a strand
     :return: boolean numpy array where cell `i` is 'True' iff strand `i` contains the input pattern
     """
-    # TODO: May need to add Stochasticity here
-    output = [(pattern in sequences.get(offset, length)) if active else False
+    output = [(pattern in sequences.get(offset, length))
+              if active else False
               for offset, length, active in zip(_offset, _length, _active)]
-    return np.asarray(output, dtype=bool)
+    return np.asarray(output, dtype=np.bool)
 
 def get_living_ids() -> NDArray[np.uint32]:
-    """
-    Get a numpy array of living strands' id values
-    """
+    """Get a numpy array of living strands' id values"""
     # equivalent to np.nonzero for a numpy boolean array
     return np.fromiter(_active.search(1), dtype=np.uint32)
+
+def get_active_mask() ->NDArray[np.bool]:
+    return np.fromiter(_active, dtype=np.bool)
 
 def get_length() -> NDArray:
     return _length

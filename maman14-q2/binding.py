@@ -51,6 +51,7 @@ def is_bound_at(strand_id:int, bind_start:int, bind_length:int) -> bool:
     :param bind_length: Length of sequence to check starting from bind_start
     :return: 'True' if this strand is bound within the given range, otherwise 'False'
     """
+    # TODO: could probably be vectorized
     bind_end = bind_start + bind_length - 1 # end index (inclusive) of input bind
     # Select entries that are active and whose id (in field A or B) match strand_ID
     select_in_A, select_in_B = _active & _A_id == strand_id, _active & _B_id == strand_id
@@ -252,12 +253,21 @@ def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[n
 
     return bound_ids, bind_start, length
 
+def is_bound(strand_id: int|NDArray[np.uint32]) -> bool|NDArray[np.bool]:
+    """
+    Check if strands are bound to any other strand. (inactive binds excluded)
+    :param strand_id: single ID or NDArray of IDs for strands to check
+    :return: if strand_id is a single int, return 'True' if it's bound, otherwise 'False.
+             if strand_id is an NDArray, return a boolean NDArray where index `i` equals
+             'True' iff `strand_id[i]` is bound to some other strand.
+    """
+    vals = np.union1d(_A_id[_active], _B_id[_active])   # sorted list of all ids that are bound
+    return np.isin(strand_id, vals) # for every strand_id, return if it's in vals
+
+
 
 # ========== RESTRICTION ENZYME FUNCTIONS ==========
 # TODO: Implement restriction enzymes
-
-# ========== MAGNETIC SEPARATION FUNCTIONS ==========
-# TODO: Magnetic separation
 
 # TODO: Multithreading takes more work than I expected, this is a LOWER PRIORITY to the rest of the project
 # TODO: added @njit wherever possible (the functions here are mostly numpy stuff, this could work)
