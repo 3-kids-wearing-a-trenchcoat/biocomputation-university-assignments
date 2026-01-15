@@ -1,13 +1,7 @@
 from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
-from threading import RLock
-from numba import njit
-from concurrent.futures import ProcessPoolExecutor
-from typing import List, Tuple, Iterable
-import strand
-from LazyLock import LazyLock
-from binding import (_A_id, _B_id, _A_start, _B_start, _length, _active, _strength, _lock)
+from binding import _active, _strength, _lock
 
 # constants
 # temperature
