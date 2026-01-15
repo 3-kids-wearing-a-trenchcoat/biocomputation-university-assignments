@@ -19,14 +19,10 @@ import numpy as np
 from numpy.typing import NDArray
 from threading import RLock
 from numba import njit
-# from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
-from typing import List, Tuple, Iterable, cast
+from typing import List, Tuple, Iterable
 import strand
-# from external_njit_functions import choose_binding_by_strength
 from LazyLock import LazyLock
-from functools import partial
-import random
 
 # constants
 # MIN_OVERLAP:int = 3
@@ -139,6 +135,8 @@ def reindex(new_strand_ids:NDArray[np.int64]|None = None) -> None:
 
     _lock.release()
 
+# ==========BINDING FUNCTIONS==========
+
 def _choose_binding(id_a:int, id_b:int) -> Tuple[int, int, int, float]|None:
     """
     Get a possible binding for strands A and B.
@@ -239,6 +237,8 @@ def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[n
                                          length[start_sorted_indexes])
 
     return bound_ids, bind_start, length
+
+# ==========ANNEALING FUNCTIONS==========
 
 @njit
 def _keep_only_unique(pairs: NDArray, hosts: NDArray|None = None) -> NDArray|Tuple[NDArray, NDArray]:
@@ -346,46 +346,33 @@ def _merge_strands(id_a:int, id_b:int, host_id:int) -> None:
     """
     Unite strand A and strand B by appending strand B to strand A.
     Will update the strand data as well as the binding data.
+    For the sake of the simulation, this function has a small probability of not doing anything
     :param id_a: id of strand A
     :param id_b: id of strand B, which will be appended to the end of strand A
     :param host_id: id of host strand. The host strand is the strand to which A and B are connected in such a way
                     that they can be merged.
     """
+    if rng.random() < ANNEALING_FAILURE_PROB:
+        return  # annealing has a small chance (equal to ANNEALING_FAILURE_PROB) of not happening
     # TODO: If this were part of a parallelized process, this should use locks of some kind.
-    new_id = strand.merge_strands(id_a, id_b)       # create merged strand and delete the two input strands
-    # # create masks for which rows reference id_a / id_b on each side (excluding inactive binds)
-    # a_in_A = (_A_id == id_a) & _active
-    # a_in_B = (_B_id == id_a) & _active
-    # b_in_A = (_A_id == id_b) & _active
-    # b_in_B = (_B_id == id_b) & _active
 
+    new_id = strand.merge_strands(id_a, id_b)       # create merged strand and delete the two input strands
     # initialize arrays that will be used by several portions of this function
     strand_lens = strand.get_length()
     a_len, b_len = strand_lens[id_a], strand_lens[id_b]
-    # bound_nucs = _get_num_of_bound_nucs_in_bind(np.arange(len(_A_id)))
 
     # TODO: Add strength calculation for everything after host
 
     # create binding to replace host binds
     old_host_binds: List[int] = _replace_binds_of_annealing_host(id_a, id_b, host_id, new_id)
-    # # exclude the removed host binds
-    # a_in_A[old_host_binds], a_in_B[old_host_binds], b_in_A[old_host_binds], b_in_B[old_host_binds] = False
-    # # Delete binding that are to be replaced
-    # _active[a_in_A | b_in_B | a_in_B | b_in_A] = False
 
     # get Indexes for which rows reference id_a / id_b on each side (excluding inactive binds)
     a_in_A_mask = (_A_id == id_a) & _active
     a_in_B_mask = (_B_id == id_a) & _active
     b_in_A_mask = (_A_id == id_b) & _active
     b_in_B_mask = (_B_id == id_b) & _active
-    # a_in_A_mask[old_host_binds], a_in_B_mask[old_host_binds], b_in_A_mask[old_host_binds], b_in_B_mask[old_host_binds] = False
     a_in_A, a_in_B = np.nonzero(a_in_A_mask)[0], np.nonzero(a_in_B_mask)[0]
     b_in_A, b_in_B = np.nonzero(b_in_A_mask)[0], np.nonzero(b_in_B_mask)[0]
-
-
-    # create new bindings
-    # strand_a_ids_in_A = np.where(a_in_A, _A_id, -1)
-    # strand_a_ids_in_B = np.where(a_in_B, _B_id, -1)
 
     # id_a in field A (host was bound to end of A, so all bind here end before the end of a)
     id_other = _B_id[a_in_A]        # a is in field A, so necessarily the other is in field B
@@ -474,9 +461,15 @@ def bulk_anneal() -> None:
     # TODO: the following section could probably be parallelized
     [_merge_strands(pair[0], pair[1], host) for pair, host in zip(candidates, host)]
 
-
+# ========== UNRAVEL FUNCTION ==========
 # TODO: bulk unravel binds at random, as a function of global temperature and per-bind strength
+
+
+
+# ========== RESTRICTION ENZYME FUNCTIONS ==========
 # TODO: Implement restriction enzymes
+
+# ========== MAGNETIC SEPARATION FUNCTIONS ==========
 # TODO: Magnetic separation
 
 # TODO: Multithreading takes more work than I expected, this is a LOWER PRIORITY to the rest of the project
