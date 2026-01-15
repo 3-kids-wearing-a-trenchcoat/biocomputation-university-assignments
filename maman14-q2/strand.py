@@ -9,7 +9,7 @@ from typing import List, Tuple
 
 # ID itself is the index value, so the offset and length of strand i are at index i of the offset and length arrays respectively
 _offset = np.empty(0,dtype=np.uint32)   # starting position of strand's sequence in sequences
-_length = np.empty(0, dtype=np.uint8)   # length of strand's sequence in sequences, starting from offset
+_length = np.empty(0, dtype=np.uint16)   # length of strand's sequence in sequences, starting from offset
 # _active = np.empty(0, dtype=bool)       # whether strand is "alive"
 _active = bitarray()                          # whether strand is alive
 _lock: threading.RLock = threading.RLock()   # Avoid race-conditions as a result of parallel writing to the above arrays
@@ -230,3 +230,6 @@ def get_living_ids() -> NDArray[np.uint32]:
     """
     # equivalent to np.nonzero for a numpy boolean array
     return np.fromiter(_active.search(1), dtype=np.uint32)
+
+def get_length() -> NDArray:
+    return _length

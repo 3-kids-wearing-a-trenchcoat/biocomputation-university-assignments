@@ -38,10 +38,10 @@ FLOAT_DTYPE = np.float32
 
 # binding data
 _A_id = np.empty(0, dtype=np.uint32)
-_A_start = np.empty(0, dtype=np.uint8)
+_A_start = np.empty(0, dtype=np.uint16)
 _B_id = np.empty(0, dtype=np.uint32)
-_B_start = np.empty(0, dtype=np.uint8)
-_length = np.empty(0, dtype=np.uint8)
+_B_start = np.empty(0, dtype=np.uint16)
+_length = np.empty(0, dtype=np.uint16)
 _strength = np.empty(0, dtype=np.float16)
 _active:NDArray[np.bool] = np.array(0, dtype=np.bool)   # active binds
 _lock = RLock() # avoid race conditions as a result of parallel writes
@@ -69,6 +69,24 @@ def is_bound_at(strand_id:int, bind_start:int, bind_length:int) -> bool:
              (start_in_B <= bind_start & bind_start <= end_in_B).any() or
              (start_in_B <= bind_end   & bind_end <= end_in_B).any())
 
+def calc_strength(id_a:int|NDArray, start_a:int|NDArray,
+                  id_b:int|NDArray, start_b:int|NDArray, length:int|NDArray) -> float|NDArray[np.float32]:
+    if type(id_a) == int:   # if input is for a single bind
+        seq_a, seq_b = strand.get_seq(id_a), strand.get_seq(id_b)
+        bind_seq_a, bind_seq_b = seq_a[start_a: start_a + length], seq_b[start_b: start_b + length]
+        comp = (bind_seq_a ^ bind_seq_b).count()
+        return (comp * 2) / (len(seq_a) + len(seq_b))
+
+    # if array of binds (assumed to be of the same length and aligned by id)
+    length_arr = strand.get_length()
+    len_a, len_b = length_arr[id_a], length_arr[id_b]   # length of strand A and strand B respectively
+    # TODO: disgustingly inefficient, reconsider
+    comp = np.array([(strand.get_seq(a)[start_a[a]: start_a[a] + len_a[a]] ^
+                      strand.get_seq(b)[start_b[b]: start_b[b] + len_b[b]]).count()
+                      for a, b in zip(id_a, id_b)], dtype=np.uint16)
+    return ((comp * 2) / (len_a + len_b)).astype(np.float32)
+
+
 def add_bind(id_a:int, start_a:int, id_b:int, start_b:int, length:int, strength:float|None=None) -> int:
     """
     Create a new duplex binding.
@@ -84,12 +102,7 @@ def add_bind(id_a:int, start_a:int, id_b:int, start_b:int, length:int, strength:
     global _A_id, _B_id, _A_start, _B_start, _length, _active, _strength
     # If strength isn't given, calculate it
     if strength is None:
-        # TODO: If I were to change strength from fraction of total nucleotides that are bound, I need to change it here too
-        seq_a, seq_b = strand.get_seq(id_a), strand.get_seq(id_b)
-        bind_seq_a, bind_seq_b = seq_a[start_a: start_a + length], seq_b[start_b: start_b + length]
-        comp = (bind_seq_a ^ bind_seq_b).count()
-        strength = comp / (len(seq_a) + len(seq_b))
-
+        strength = calc_strength(id_a, start_a, id_b, start_b, length)
     _lock.acquire()
     new_id = len(_A_id)
     _A_id, _B_id = np.append(_A_id, id_a), np.append(_B_id, id_b)
@@ -151,19 +164,6 @@ def _choose_binding(id_a:int, id_b:int) -> Tuple[int, int, int, float]|None:
     chosen = int(rng.choice(len(candidates), p=probs))
     return candidates[chosen]
 
-
-# def _validate_bind(strand_locks: LazyLock, id_a:int, start_a:int, id_b:int, start_b:int, length:int) -> bool:
-#     if id_a < id_b:
-#         first_lock, second_lock = strand_locks[id_a], strand_locks[id_b]
-#     else:
-#         first_lock, second_lock = strand_locks[id_b], strand_locks[id_a]
-#     first_lock.acquire()
-#     second_lock.acquire()
-#     conflict = (not is_bound_at(id_a, start_a, length)) and (not is_bound_at(id_b, start_b, length))
-#     second_lock.release()
-#     first_lock.release()
-#     return conflict
-
 def _validate_bind(id_a:int, start_a:int, id_b:int, start_b:int, length:int) -> bool:
     # This function only reads, and modifications only happen after all _validate_bind are done, so no locks needed here
     # check if strand A or strand B are already bound at their intended binding span
@@ -212,16 +212,16 @@ def bulk_bind(repetitions:int=10) -> None:
          for i in range(len(start_a)) if bind_is_valid[i]] # TODO: BAD AND SLOW
 
 @njit
-def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[np.uint32], NDArray[np.uint8],
-                                                                                                NDArray[np.uint8]]:
+def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[np.uint32], NDArray[np.uint16],
+                                                                                                NDArray[np.uint16]]:
     """
     Get all strands bound to the input strand
     :param host_id: id of the host strand ("host" being the strand all the output strands are bound to)
     :param sort_by_start: Whether to sort the output arrays by start position
     :return: Tuple of 3 numpy arrays, they are (in order)
              1. array of IDs of strands bound to the host (np.uint32)
-             2. array of binding start position relative to host (np.uint8)
-             3. array of binding lengths (np.uint8)
+             2. array of binding start position relative to host (np.uint16)
+             3. array of binding lengths (np.uint16)
     """
     # TODO: It may be smart to instead have some kind of hash map instead of recreate this at every annealing
     host_id_in_A = (_A_id == host_id)
@@ -268,6 +268,80 @@ def _keep_only_unique(pairs: NDArray, hosts: NDArray|None = None) -> NDArray|Tup
         return pairs[keep_mask]
     return pairs[keep_mask], hosts[keep_mask]
 
+def _replace_binds_of_annealing_host(id_a:int, id_b:int, id_host:int, id_new:int) -> List[int]:
+    """
+    the new strand C (id_new) has just been created by appending B (id_b) to the end of A (id_a).
+    This function replaces the two binds `A <-> host` and `B <-> host` with a single `C <-> host` binding.
+    :param id_a: id of strand making up the left part of the new strand
+    :param id_b: id of strand making up the right part of the new strand
+    :param id_host: id of the strand to which both A and B are bound adjacently
+    :param id_new: id of the strand resulting from the annealing of A and B
+    :return: List containing the two id values of the bindings that were just replaced (deleted)
+    """
+    global _active
+    host_in_A_mask = ((_B_id == id_a) | (_B_id == id_b)) & _active & (_A_id == id_host)
+    host_in_B_mask = ((_A_id == id_a) | (_A_id == id_b)) & _active & (_B_id == id_host)
+    # sanity check -- should be a total of two entries, one for id_a and one for id_b
+    assert np.count_nonzero(host_in_A_mask) + np.count_nonzero(host_in_B_mask) == 2
+    # end of sanity check
+
+    # find IDs of old binds
+    old_binds = np.nonzero(host_in_A_mask | host_in_B_mask)[0].tolist()
+    # order old bind IDs so that index 0 stores the bind between host and A, and index 1 stores the bind between host and B
+    if _A_id[old_binds[0]] == id_b or _B_id[old_binds[0]] == id_b:  # if id_b appears in bind 0
+        old_binds = [old_binds[1], old_binds[0]]                    # flip order so id_b appears in bind 1
+    # select correct length arrays for strands A and host
+    start_of_a, start_of_host = (_A_start, _B_start) if _A_id[old_binds[0]] == id_a else (_B_start, _A_start)
+    # get start and length values for new bind
+    start_new = start_of_a[old_binds[0]]
+    new_length = _length[old_binds[0]] + _length[old_binds[1]]
+    start_host = start_of_host[old_binds[0]]
+    # calculate strength
+    sum_of_bounds_nucs = _get_num_of_bound_nucs_in_bind(old_binds).sum()
+    lengths = strand.get_length()
+    total_nucs = lengths[id_new] + lengths[id_host]
+    strength = sum_of_bounds_nucs / total_nucs
+    # (soft) delete old binds
+    _active[old_binds] = False
+    # create new bind
+    add_bind(id_new, start_new, id_host, start_host, new_length, strength)
+
+    return old_binds
+
+def _bulk_add(id_a: NDArray, start_a: NDArray, id_b: NDArray, start_b: NDArray,
+              length: NDArray, strength:NDArray|None = None) -> None:
+    global _A_id, _A_start, _B_id, _B_start, _length, _strength, _active
+    if strength is None:
+        strength = calc_strength(id_a, start_a, id_b, start_b, length)
+    _lock.acquire()
+    _A_id = np.concatenate((_A_id, id_a))
+    _A_start = np.concatenate((_A_start, start_a))
+    _B_id = np.concatenate((_B_id, id_b))
+    _B_start = np.concatenate((_B_start, start_b))
+    _length = np.concatenate((_length, length))
+    _strength = np.concatenate((_strength, strength))
+    _active = np.concatenate((_active, np.ones(len(id_a), dtype=np.bool)))
+    _lock.release()
+
+def _get_num_of_bound_nucs_in_bind(bind_id:int|NDArray|List) -> int|NDArray:
+    """
+    Determine the number of bound nucleotides in one or several binds.
+    Binding strength is defined as the fraction of the number of total nucleotides in the bind (total nucs in A
+    plus total nucs in B) which are bound to a complementary nucleotide.
+    Since we know the final strength, we can extract it by multiplying strength by sum of lengths of A and B.
+    :param bind_id: int or NDArray of ints -- bind ID we want to check
+    :return: number of bound nucleotides -- if NDArray was given, return NDArray where index `i` represents the number
+                                            of bound nucleotides for the binding `bind_id[i]`.
+                                            If the specified bind is not active, return 0.
+    """
+    if type(bind_id) == List:
+        bind_id = np.array(bind_id)
+    length = strand.get_length()[bind_id]
+    strength = _strength[bind_id]
+    strength[~_active] = 0  # strength of inactive binds is 0
+    id_a, id_b = _A_id[bind_id], _B_id[bind_id]
+    return (strength * (length[id_a] + length[id_b])).round().astype(np.uint16)
+
 def _merge_strands(id_a:int, id_b:int, host_id:int) -> None:
     """
     Unite strand A and strand B by appending strand B to strand A.
@@ -279,26 +353,108 @@ def _merge_strands(id_a:int, id_b:int, host_id:int) -> None:
     """
     # TODO: If this were part of a parallelized process, this should use locks of some kind.
     new_id = strand.merge_strands(id_a, id_b)       # create merged strand and delete the two input strands
-    # create masks for which rows reference id_a / id_b on each side (excluding inactive binds)
-    a_in_A = (_A_id == id_a) & _active
-    a_in_B = (_B_id == id_a) & _active
-    b_in_A = (_A_id == id_b) & _active
-    b_in_B = (_B_id == id_b) & _active
-    # find and exclude host bind from the above (this will be explicitly handled now)
-    host_bind_mask = ((a_in_A | b_in_A) & (_B_id == host_id)) | ((a_in_B | b_in_B) & (_A_id == host_id))
-    assert np.count_nonzero(host_bind_mask) == 2    # sanity check, should be host bound to a and host bound to b, no more
-    binds_with_host = np.nonzero(host_bind_mask)[0]    # get indexes of host bind
-    a_in_A[binds_with_host], a_in_B[binds_with_host], b_in_A[binds_with_host], b_in_B[binds_with_host] = False
-    _active[binds_with_host[0]], _active[binds_with_host[1]] = 0, 0 # delete binds featuring host
+    # # create masks for which rows reference id_a / id_b on each side (excluding inactive binds)
+    # a_in_A = (_A_id == id_a) & _active
+    # a_in_B = (_B_id == id_a) & _active
+    # b_in_A = (_A_id == id_b) & _active
+    # b_in_B = (_B_id == id_b) & _active
 
-    
+    # initialize arrays that will be used by several portions of this function
+    strand_lens = strand.get_length()
+    a_len, b_len = strand_lens[id_a], strand_lens[id_b]
+    # bound_nucs = _get_num_of_bound_nucs_in_bind(np.arange(len(_A_id)))
 
-# TODO: Bulk annealing (stochastic)
+    # TODO: Add strength calculation for everything after host
+
+    # create binding to replace host binds
+    old_host_binds: List[int] = _replace_binds_of_annealing_host(id_a, id_b, host_id, new_id)
+    # # exclude the removed host binds
+    # a_in_A[old_host_binds], a_in_B[old_host_binds], b_in_A[old_host_binds], b_in_B[old_host_binds] = False
+    # # Delete binding that are to be replaced
+    # _active[a_in_A | b_in_B | a_in_B | b_in_A] = False
+
+    # get Indexes for which rows reference id_a / id_b on each side (excluding inactive binds)
+    a_in_A_mask = (_A_id == id_a) & _active
+    a_in_B_mask = (_B_id == id_a) & _active
+    b_in_A_mask = (_A_id == id_b) & _active
+    b_in_B_mask = (_B_id == id_b) & _active
+    # a_in_A_mask[old_host_binds], a_in_B_mask[old_host_binds], b_in_A_mask[old_host_binds], b_in_B_mask[old_host_binds] = False
+    a_in_A, a_in_B = np.nonzero(a_in_A_mask)[0], np.nonzero(a_in_B_mask)[0]
+    b_in_A, b_in_B = np.nonzero(b_in_A_mask)[0], np.nonzero(b_in_B_mask)[0]
+
+
+    # create new bindings
+    # strand_a_ids_in_A = np.where(a_in_A, _A_id, -1)
+    # strand_a_ids_in_B = np.where(a_in_B, _B_id, -1)
+
+    # id_a in field A (host was bound to end of A, so all bind here end before the end of a)
+    id_other = _B_id[a_in_A]        # a is in field A, so necessarily the other is in field B
+    start_other = _B_start[a_in_A]  # start for other remains unchanged
+    start_new = _A_start[a_in_A]    # the start in the new strand is the same as the old a
+    length = _length[a_in_A]        # length unchanged
+    new_id_arr = np.full(len(length), new_id, dtype=np.uint32)
+    # calc strength
+    other_strand_length = strand_lens[id_other]
+    total_strand_length = other_strand_length + a_len
+    comp_num = _get_num_of_bound_nucs_in_bind(a_in_A)
+    strength = (comp_num / total_strand_length).round()
+    # add new and delete old
+    _bulk_add(new_id_arr, start_new, id_other, start_other, length, strength)
+    _active[a_in_A] = False
+
+    # id_a in field B               (same as id_a in A, but with fields switched)
+    id_other = _A_id[a_in_B]
+    start_other = _A_start[a_in_B]
+    start_new = _B_start[a_in_B]
+    length = _length[a_in_B]
+    new_id_arr = np.full(len(length), new_id, dtype=np.uint32)
+    # calc strength
+    other_strand_length = strand_lens[id_other]
+    total_strand_length = other_strand_length + b_len
+    comp_num = _get_num_of_bound_nucs_in_bind(a_in_B)
+    strength = (comp_num / total_strand_length).round()
+    # add new and delete old
+    _bulk_add(new_id_arr, start_new, id_other, start_other, length, strength)
+    _active[a_in_B] = False
+
+    # id_b in field A (host was bound to the start B, so all binds here start after the start of B)
+    id_other = _B_id[b_in_A]
+    start_other = _B_start[b_in_A]
+    start_new = _A_start[b_in_A] + a_len
+    length = _length[b_in_A]
+    new_id_arr = np.full(len(length), new_id, dtype=np.uint32)
+    # calc strength
+    other_strand_length = strand_lens[id_other]
+    total_strand_length = other_strand_length + a_len
+    comp_num = _get_num_of_bound_nucs_in_bind(b_in_A)
+    strength = (comp_num / total_strand_length).round()
+    # add new and delete old
+    _bulk_add(new_id_arr, start_new, id_other, start_other, length, strength)
+    _active[b_in_A] = False
+
+    # id_b in field B
+    id_other = _A_id[b_in_B]
+    start_other = _A_start[b_in_B]
+    start_new = _B_start[b_in_B] + a_len
+    length = _length[b_in_B]
+    new_id_arr = np.full(len(length), new_id, dtype=np.uint32)
+    # calc strength
+    other_strand_length = strand_lens[id_other]
+    total_strand_length = other_strand_length + b_len
+    comp_num = _get_num_of_bound_nucs_in_bind(b_in_B)
+    strength = (comp_num / total_strand_length).round()
+    # add new and delete old
+    _bulk_add(new_id_arr, start_new, id_other, start_other, length, strength)
+    _active[b_in_B] = False
+
+    # TODO: I can't even imagine how to begin debugging this, this is a candidate for fuck ups
+
+
 def bulk_anneal() -> None:
     """Anneal all neighboring strands that are bound to the same third strand with a small probability of failure."""
     # get ids, start position (relative to host) and bind lengths each strand bound to host
-    bound_ids, bind_start = np.array([], dtype=np.uint32), np.array([], dtype=np.uint8)
-    length, hosts = np.array([], dtype=np.uint8), np.array([], dtype=np.uint32)
+    bound_ids, bind_start = np.array([], dtype=np.uint32), np.array([], dtype=np.uint16)
+    length, hosts = np.array([], dtype=np.uint16), np.array([], dtype=np.uint32)
     for host_id in strand.get_living_ids():
         # bound_ids, bind_start, length = get_bound_strands(host_id)
         func_output = get_bound_strands(host_id)
