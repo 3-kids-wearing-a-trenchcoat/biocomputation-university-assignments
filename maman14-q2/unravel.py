@@ -7,7 +7,7 @@ from concurrent.futures import ProcessPoolExecutor
 from typing import List, Tuple, Iterable
 import strand
 from LazyLock import LazyLock
-from binding import (_A_id, _B_id, _A_start, _B_start, _length, _active, _strength)
+from binding import (_A_id, _B_id, _A_start, _B_start, _length, _active, _strength, _lock)
 
 # constants
 # temperature
@@ -44,6 +44,10 @@ def select_binds_to_unravel(temperature:float) -> NDArray[np.uint32]:
     active_idx = np.nonzero(_active)
     return active_idx[unravel_mask]
 
-
-
-
+def bulk_unravel(temperature:float) -> None:
+    """Unravel bindings at random as a function of temperature. (hotter = stronger binds are more likely to unravel)
+    The probability of each binding to unravel is weighted by its strength. (stronger = less likely to unravel)"""
+    _lock.acquire()
+    to_unravel = select_binds_to_unravel(temperature)
+    _active[to_unravel] = False
+    _lock.release()
