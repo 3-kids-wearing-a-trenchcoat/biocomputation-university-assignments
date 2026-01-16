@@ -16,13 +16,15 @@ _seq = TwoBitArray(_nucleotide_syntax)    # The logical array in which all DNA s
 _active = bitarray()                      # bitmap representing whether the sequence is deleted (equals 0)
 _lock = RLock()                           # Prevent race-conditions as a result of parallel writing
 
-def seq_append(input_seq: TwoBitArray) -> Tuple[int, int]:
+def seq_append(input_seq: TwoBitArray|Iterable) -> Tuple[int, int]:
     """
     Store a nucleotide sequence in memory and return its location
     :param input_seq: Iterable representing a nucleotide sequence, may only contain the characters T,G,C,A
     :return: (offset, length) Tuple, where offset is the index from which this newly added sequence is stored
              and length is the number of subsequent indexes that are part of this sequence
     """
+    if type(input_seq) != TwoBitArray:
+        input_seq = TwoBitArray.from_iterable(input_seq, _nucleotide_syntax)
     _lock.acquire()
     offset = len(_seq)
     length = len(input_seq)
