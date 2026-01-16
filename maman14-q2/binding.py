@@ -237,8 +237,8 @@ def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[n
              3. array of binding lengths (np.uint16)
     """
     # TODO: It may be smart to instead have some kind of hash map instead of recreate this at every annealing
-    host_id_in_A = (_A_id == host_id)
-    host_id_in_B = (_B_id == host_id)
+    host_id_in_A = (_A_id == host_id) & _active
+    host_id_in_B = (_B_id == host_id) & _active
 
     bound_ids1, bound_ids2 = _B_id[host_id_in_A], _A_id[host_id_in_B]
     bound_ids = np.concatenate((bound_ids1, bound_ids2))
@@ -253,6 +253,15 @@ def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[n
 
     return bound_ids, bind_start, length
 
+def get_bound_ids(host_id:int|NDArray[np.uint32]) -> NDArray[np.uint32]:
+    """Get just the IDs of strands bound to host_id"""
+    host_id_in_A_mask = np.isin(_A_id, host_id) & _active
+    host_id_in_B_mask = np.isin(_B_id, host_id) & _active
+    bound_ids_a = _B_id[host_id_in_A_mask]
+    bound_ids_b = _A_id[host_id_in_B_mask]
+    # return np.unique(np.concatenate((bound_ids_a, bound_ids_b)))
+    return np.union1d(bound_ids_a, bound_ids_b)
+
 def is_bound(strand_id: int|NDArray[np.uint32]) -> bool|NDArray[np.bool]:
     """
     Check if strands are bound to any other strand. (inactive binds excluded)
@@ -264,6 +273,25 @@ def is_bound(strand_id: int|NDArray[np.uint32]) -> bool|NDArray[np.bool]:
     vals = np.union1d(_A_id[_active], _B_id[_active])   # sorted list of all ids that are bound
     return np.isin(strand_id, vals) # for every strand_id, return if it's in vals
 
+def get_binds_that_contain(strand_id: NDArray[np.uint32]) -> NDArray[np.uint32]:
+    """Get IDs of all binds that contain one of the input strand IDs"""
+    mask_a, mask_b = np.isin(_A_id, strand_id), np.isin(_B_id, strand_id)
+    idx_a, idx_b = np.nonzero(mask_a & _active), np.nonzero(mask_b & _active)
+    return np.union1d(idx_a, idx_b).astype(np.uint32)
+
+def delete_all_with_strand_id(strand_id: int|NDArray[np.uint32]) -> None:
+    """
+    Delete all binds that contain the input strand(s) or do NOT contain it/them
+    :param strand_id: int representing a single strand ID or an NDArray of strand IDs
+    """
+    _lock.acquire()
+    # _active[strand_id] = False
+    to_delete = get_binds_that_contain(strand_id)
+    _active[to_delete] = False
+    _lock.release()
+
+def get_entry_num() -> int:
+    return len(_active)
 
 
 # ========== RESTRICTION ENZYME FUNCTIONS ==========

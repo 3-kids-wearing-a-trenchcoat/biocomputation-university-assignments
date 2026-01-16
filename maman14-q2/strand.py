@@ -255,5 +255,10 @@ def is_magnetic(strand_id:int) -> bool:
 
 def get_magnetic_id() -> NDArray[np.uint32]:
     """get IDs of all living magnetic strands"""
-    np_magnetic = np.fromiter(_magnetic & _active, dtype=np.bool)
-    return np.nonzero(np_magnetic)[0].astype(np.uint32)
+    return np.nonzero(get_magnetic_mask())[0].astype(np.uint32)
+
+def get_magnetic_mask() -> NDArray[np.bool]:
+    return np.fromiter(_magnetic & _active, dtype=np.bool)
+
+def get_entry_num() -> int:
+    return len(_active)
