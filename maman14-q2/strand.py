@@ -28,13 +28,13 @@ def get_seq(strand_id:int, decoded:bool = False) -> TwoBitArray|List:
         return sequences.decode(offset, length)
     return sequences.get(offset, length)
 
-def new_strand(input_seq: TwoBitArray, is_magnetic:bool=False) -> int:
+def new_strand(input_seq: TwoBitArray, magnetic:bool=False) -> int:
     global _offset, _length, _active
     _lock.acquire()
     offset, length = sequences.seq_append(input_seq)
     _offset, _length = np.append(_offset, offset), np.append(_length, length)
     _active.append(1)
-    _magnetic.append(is_magnetic)
+    _magnetic.append(magnetic)
     output_id = len(_offset) - 1
     _lock.release()
     return output_id
