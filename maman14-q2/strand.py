@@ -12,6 +12,7 @@ _offset = np.empty(0,dtype=np.uint32)   # starting position of strand's sequence
 _length = np.empty(0, dtype=np.uint16)   # length of strand's sequence in sequences, starting from offset
 # _active = np.empty(0, dtype=bool)       # whether strand is "alive"
 _active = bitarray()                          # whether strand is alive
+_magnetic = bitarray()                        # whether strand is magnetic (for selection)
 _lock: threading.RLock = threading.RLock()   # Avoid race-conditions as a result of parallel writing to the above arrays
 
 def get_seq(strand_id:int, decoded:bool = False) -> TwoBitArray|List:
@@ -27,12 +28,13 @@ def get_seq(strand_id:int, decoded:bool = False) -> TwoBitArray|List:
         return sequences.decode(offset, length)
     return sequences.get(offset, length)
 
-def new_strand(input_seq: TwoBitArray) -> int:
+def new_strand(input_seq: TwoBitArray, is_magnetic:bool=False) -> int:
     global _offset, _length, _active
     _lock.acquire()
     offset, length = sequences.seq_append(input_seq)
     _offset, _length = np.append(_offset, offset), np.append(_length, length)
     _active.append(1)
+    _magnetic.append(is_magnetic)
     output_id = len(_offset) - 1
     _lock.release()
     return output_id
@@ -64,7 +66,7 @@ def reindex() -> NDArray[np.int64]:
     :return: numpy array of the same size as the old _offset and _length, where the value of the i-th cell
              contains the new index of the strand of id i, or -1 if this strand has been pruned.
     """
-    global _offset, _length, _active
+    global _offset, _length, _active, _magnetic
     # acquire locks
     _lock.acquire()
     sequences.acquire_lock()
@@ -76,7 +78,8 @@ def reindex() -> NDArray[np.int64]:
     _offset, _length = _offset[alive], _length[alive]
     _active = bitarray(len(_offset))
     _active.setall(1)
-
+    new_magnetic_np = np.fromiter(_magnetic, dtype=np.bool)[alive]
+    _magnetic = bitarray(new_magnetic_np.tolist())
     # release locks
     sequences.release_lock()
     _lock.release()
@@ -246,3 +249,11 @@ def get_active_mask() ->NDArray[np.bool]:
 
 def get_length() -> NDArray:
     return _length
+
+def is_magnetic(strand_id:int) -> bool:
+    return _magnetic[strand_id] == 1
+
+def get_magnetic_id() -> NDArray[np.uint32]:
+    """get IDs of all living magnetic strands"""
+    np_magnetic = np.fromiter(_magnetic & _active, dtype=np.bool)
+    return np.nonzero(np_magnetic)[0].astype(np.uint32)
