@@ -132,12 +132,31 @@ def validate_formula(formula:Formula) -> int:
 
 
 # ===== generate constraints =====
-# TODO
+def generate_constraints(formula: Formula) -> None:
+    for clause in formula:  # for each clause
+        constraints = []
+        for literal in clause:
+            # choose literal representation based on if the literal is the variable of its negation
+            var_num = literal[0]
+            literal_rep = variable_rep_true[var_num] if literal[1] else variable_rep_false[var_num]
+            right_connector = connector_rep[var_num + 1]
+            constraint = literal_rep.concat(right_connector)
+            if var_num == 0:                # constraints for x_0 include connector c_0 as well as c_1
+                constraint = connector_rep[0].concat(constraint)
+            constraints.append(~constraint) # The complementary of the constraint we've built is what will bind to the desired sequence
+        constraint_rep.append(constraints)
 
 # ===== initialize 3SAT =====
-def init_3SAT(formula: Formula) -> None:
+def init_3sat(formula: Formula) -> None:
     """
-    Initialize the 3SAT problem according to the formula
-    :param formula:
-    :return:
+    Initialize the 3SAT problem according to the formula.
+    It is assumed the input formula is in 3SAT form, meaning clauses are all in an AND relation literals
+    in each clause are in an OR relation.
+    :param formula: List of clauses. Each Clause is a length 3 tuple of literals.
+                    Each literal is an (int, bool) tuple representing the variable number and whether the literal
+                    for that variable is true of false respectively.
     """
+    n = validate_formula(formula)
+    set_dna_rep_params(n)
+    generate_unique_representations(n)
+    generate_constraints(formula)
