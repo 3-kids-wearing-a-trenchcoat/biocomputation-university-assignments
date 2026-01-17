@@ -154,15 +154,15 @@ def populate_strands(n:int):
         for i in range(n):
             t_lit = connector_rep[i].concat(variable_rep_true[i])
             f_lit = connector_rep[i].concat(variable_rep_false[i])
-            strand.new_strand(t_lit)
-            strand.new_strand(f_lit)
+            [strand.new_strand(t_lit) for _ in range(copies_per_literal)]
+            [strand.new_strand(f_lit) for _ in range(copies_per_literal)]
             p.update(2)
-        strand.new_strand(connector_rep[n])
+        [strand.new_strand(connector_rep[n]) for _ in range(copies_per_literal)]
         p.update(1)
 
-    for rep in tqdm(complement_rep, total=len(complement_rep), position=1,
+    for rep in tqdm(complement_rep, position=1,
                     desc="populating complement strands", dynamic_ncols=True, leave=True):
-        strand.new_strand(rep)
+        [strand.new_strand(rep) for _ in range(copies_per_literal)]
 
 
 def init_3sat(formula: Formula) -> None:
