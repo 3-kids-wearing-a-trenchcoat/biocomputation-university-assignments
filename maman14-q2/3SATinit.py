@@ -25,6 +25,7 @@ copies_per_connector: int = T * SAFETY_FACTOR   # number of copies of connectors
 variable_rep_true: List[TwoBitArray] = []       # cell `i` holds the representation of assigning x_i the value 'True'
 variable_rep_false: List[TwoBitArray] = []      # cell `i` holds the representation of assigning x_i the value 'False'
 connector_rep: List[TwoBitArray] = []           # cell `i` holds the representation of the connector c_i
+complement_rep: List[TwoBitArray] = []          # cell `i` holds complement strand exposing sticky ends
 # constraint representations
 constraint_rep: List[List[TwoBitArray]] = []    # cell `i` represents a boolean clause made up of 3 constraints
 # each constraint is a concatenation of a literal (true of false variable) and a connector (representing position)
@@ -77,12 +78,26 @@ def generate_unique_representations(n: int) -> None:
     Initialize the representation lists by generating a unique representation for every literal and every connector
     :param n: number of variables (n variables - n positive literals - n negative literals - n+1 connectors)
     """
-    for i in range(n):  # generate n representations each for pos-literal, neg-literal and connectors
-        variable_rep_true.append(get_new_representation())
-        variable_rep_false.append(get_new_representation())
+    with tqdm(total=3*n, desc="generating unique molecular representations") as p:
+        for _ in range(n):  # generate n representations each for pos-literal, neg-literal and connectors
+            variable_rep_true.append(get_new_representation())
+            variable_rep_false.append(get_new_representation())
+            connector_rep.append(get_new_representation())
+            p.update(3)
+        # generate one extra representation for connectors
         connector_rep.append(get_new_representation())
-    # generate one extra representation for connectors
-    connector_rep.append(get_new_representation())
+        p.update(1)
+
+def generate_complementary_strands(n: int):
+    # for i in range(n):
+    for i in trange(n, desc="generating complementary strands"):
+        comp_for_true = variable_rep_true[i].concat(connector_rep[i + 1])
+        comp_for_false = variable_rep_false[i].concat(connector_rep[i + 1])
+        if i == 0:
+            comp_for_true = connector_rep[0].concat(comp_for_true)
+            comp_for_false = connector_rep[0].concat(comp_for_false)
+        complement_rep.append(comp_for_true)
+        complement_rep.append(comp_for_false)
 
 # ===== parse input =====
 type Literal = Tuple[int, bool]                 # (variable number, literal is True)
@@ -132,21 +147,23 @@ def validate_formula(formula:Formula) -> int:
 
 
 # ===== generate constraints =====
-def generate_constraints(formula: Formula) -> None:
-    for clause in formula:  # for each clause
-        constraints = []
-        for literal in clause:
-            # choose literal representation based on if the literal is the variable of its negation
-            var_num = literal[0]
-            literal_rep = variable_rep_true[var_num] if literal[1] else variable_rep_false[var_num]
-            right_connector = connector_rep[var_num + 1]
-            constraint = literal_rep.concat(right_connector)
-            if var_num == 0:                # constraints for x_0 include connector c_0 as well as c_1
-                constraint = connector_rep[0].concat(constraint)
-            constraints.append(~constraint) # The complementary of the constraint we've built is what will bind to the desired sequence
-        constraint_rep.append(constraints)
+# def generate_constraints(formula: Formula) -> None:
+#     for clause in formula:  # for each clause
+#         constraints = []
+#         for literal in clause:
+#             # choose literal representation based on if the literal is the variable of its negation
+#             var_num = literal[0]
+#             literal_rep = variable_rep_true[var_num] if literal[1] else variable_rep_false[var_num]
+#             right_connector = connector_rep[var_num + 1]
+#             constraint = literal_rep.concat(right_connector)
+#             if var_num == 0:                # constraints for x_0 include connector c_0 as well as c_1
+#                 constraint = connector_rep[0].concat(constraint)
+#             constraints.append(~constraint) # The complementary of the constraint we've built is what will bind to the desired sequence
+#         constraint_rep.append(constraints)
 
 # ===== initialize 3SAT =====
+
+
 def init_3sat(formula: Formula) -> None:
     """
     Initialize the 3SAT problem according to the formula.
@@ -159,4 +176,5 @@ def init_3sat(formula: Formula) -> None:
     n = validate_formula(formula)
     set_dna_rep_params(n)
     generate_unique_representations(n)
+    generate_complementary_strands(n)
     generate_constraints(formula)
