@@ -15,6 +15,9 @@ type Formula = List[Clause]
 # constants
 ANNEALING_REPS = 20
 
+# global variables
+temperature = 55
+
 # functions
 def generate_constraints(clause: Clause) -> Tuple[TwoBitArray, TwoBitArray, TwoBitArray]:
     """Generate 3 TwoBitArray objects representing the input clause."""
@@ -31,6 +34,16 @@ def generate_constraints(clause: Clause) -> Tuple[TwoBitArray, TwoBitArray, TwoB
         lit2 = connector_rep[var2 - 1].concat(lit2)
     return lit0, lit1, lit2
 
+# TODO: implement magnetic selection routine
+# TODO: Implement magnetic strand removal routine, which heats the sample to unbind all and then removes magnetic strands
+# TODO: Implement "cool" routine which binds, anneals and unbinds depending on temperature
+# TODO: Implement "heat" routine which unbinds depending on temperature
+# TODO: (probably?) Implement annealing routine which works until no significant change is made
+# TODO: (maybe?) Implement bind routine which works until no significant change is made
+# TODO: (maybe?) Implement unbind routine which works until no significant change is made
+# TODO: Implement primer seeding
+# TODO: Implement PCR routine, that is, throw in primers and let them bind
+# TODO: implement "initial selection" routine which filters by strand size, start with a_0 x_0 and end with x_{n-1} a_n
 
 
 def run(formula: Formula) -> None:
