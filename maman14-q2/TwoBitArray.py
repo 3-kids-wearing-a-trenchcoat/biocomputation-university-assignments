@@ -1,4 +1,4 @@
-from bitarray import bitarray
+from bitarray import bitarray, util
 from typing import Iterable, Tuple, List
 
 class TwoBitArray:
@@ -6,7 +6,7 @@ class TwoBitArray:
     Supports a syntax which matches each of the 4 possible values to some custom value"""
 
     DEFAULT_SYNTAX = [0,1,2,3]
-    ENDIAN = 'little'
+    # ENDIAN = 'little'
 
     def __init__(self, syntax=DEFAULT_SYNTAX):
         """
@@ -202,4 +202,14 @@ class TwoBitArray:
         output.extend(other)
         return output
 
-    # TODO: convert to boolean NDArray, maybe?
+    @staticmethod
+    def random(length:int, syntax=DEFAULT_SYNTAX) -> TwoBitArray:
+        """
+        Generate a random TwoBitArray
+        :param length: length of random TwoBitArray
+        :param syntax: 4-items-long syntax list, matching by index to [00, 01, 10, 11]. defaults to [0,1,2,3].
+        :return: TwoBitArray
+        """
+        output = TwoBitArray(syntax)
+        output.left, output.right = util.random_p(length), util.random_p(length)
+        return output
