@@ -5,12 +5,11 @@ import sequences
 from TwoBitArray import TwoBitArray
 from bitarray import bitarray
 import threading
-from typing import List, Tuple
+from typing import List, Tuple, Iterable
 
 # ID itself is the index value, so the offset and length of strand i are at index i of the offset and length arrays respectively
 _offset = np.empty(0,dtype=np.uint32)   # starting position of strand's sequence in sequences
 _length = np.empty(0, dtype=np.uint16)   # length of strand's sequence in sequences, starting from offset
-# _active = np.empty(0, dtype=bool)       # whether strand is "alive"
 _active = bitarray()                          # whether strand is alive
 _magnetic = bitarray()                        # whether strand is magnetic (for selection)
 _lock: threading.RLock = threading.RLock()   # Avoid race-conditions as a result of parallel writing to the above arrays
@@ -28,7 +27,7 @@ def get_seq(strand_id:int, decoded:bool = False) -> TwoBitArray|List:
         return sequences.decode(offset, length)
     return sequences.get(offset, length)
 
-def new_strand(input_seq: TwoBitArray, magnetic:bool=False) -> int:
+def new_strand(input_seq: TwoBitArray|Iterable, magnetic:bool=False) -> int:
     global _offset, _length, _active
     _lock.acquire()
     offset, length = sequences.seq_append(input_seq)
