@@ -213,3 +213,9 @@ class TwoBitArray:
         output = TwoBitArray(syntax)
         output.left, output.right = util.random_p(length), util.random_p(length)
         return output
+
+    def concat(self, other: TwoBitArray) -> TwoBitArray:
+        """get a new TwoBitArray which is a concatenation of self with other"""
+        output = self.copy()
+        output.extend(other)
+        return output
