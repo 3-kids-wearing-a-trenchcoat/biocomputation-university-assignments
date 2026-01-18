@@ -299,7 +299,7 @@ def get_entry_num() -> int:
     return len(_active)
 
 def get_active_num() -> int:
-    return np.count_nonzero(_active)[0]
+    return np.count_nonzero(_active).astype(int)
 
 def get_all_bound_strands() -> NDArray[np.uint32]:
     """Get IDs of all strands that are bound (in order)"""
