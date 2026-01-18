@@ -9,8 +9,8 @@ import strand
 
 # constants
 NUCLEOTIDE_SYNTAX = ['T', 'G', 'C', 'A']
-T = 1000000             # Number of complete assemblies (solutions) I want to simulate
-SAFETY_FACTOR = 2       # Safety factor to account for inefficiencies
+T = 5e5             # Number of complete assemblies (solutions) I want to simulate
+SAFETY_FACTOR = 1       # Safety factor to account for inefficiencies
 MAX_COMP_ALPHA = 0.3    # Maximum ratio of complementary between any two representations
 
 # global vars
@@ -18,7 +18,7 @@ MAX_COMP_ALPHA = 0.3    # Maximum ratio of complementary between any two represe
 rep_len: int|None = None                        # length of representation in nucleotides
 max_complementarity: int|None = None            # maximum allowed complementarity between every two representations
 copies_per_literal: int = math.ceil((T / 2) * SAFETY_FACTOR)     # Number of copies per literal (x_i) to start with
-copies_per_connector: int = T * SAFETY_FACTOR   # number of copies of connectors (c_i) to start with
+copies_per_connector: int = math.ceil(T * SAFETY_FACTOR)   # number of copies of connectors (c_i) to start with
 #  component representations
 variable_rep_true: List[TwoBitArray] = []       # cell `i` holds the representation of assigning x_i the value 'True'
 variable_rep_false: List[TwoBitArray] = []      # cell `i` holds the representation of assigning x_i the value 'False'
@@ -136,7 +136,9 @@ def validate_formula(formula:Formula) -> int:
             var, pol = literal
             if not isinstance(var, int) or var < 0:
                 raise ValueError(f"Invalid variable index {var} in clause {ci}")
-            if pol not in (+1, -1):
+            # if pol not in (+1, -1):
+            #     raise ValueError(f"Invalid polarity {pol} in clause {ci}")
+            if type(pol) != bool:
                 raise ValueError(f"Invalid polarity {pol} in clause {ci}")
             seen_vars.add(var)
     # Check consecutiveness
@@ -149,16 +151,31 @@ def validate_formula(formula:Formula) -> int:
 
 # ===== initialize 3SAT =====
 def populate_strands(n:int):
-    with tqdm(total=n + 1, position=1, dynamic_ncols=True, leave=True,
-              desc="populating component strands") as p:
-        for i in range(n):
-            t_lit = connector_rep[i].concat(variable_rep_true[i])
-            f_lit = connector_rep[i].concat(variable_rep_false[i])
-            [strand.new_strand(t_lit) for _ in range(copies_per_literal)]
-            [strand.new_strand(f_lit) for _ in range(copies_per_literal)]
-            p.update(2)
-        [strand.new_strand(connector_rep[n]) for _ in range(copies_per_literal)]
-        p.update(1)
+    # with tqdm(total=n + 1, position=1, dynamic_ncols=True, leave=True,
+    #           desc="populating component strands") as p:
+    #     for i in range(n):
+    #         t_lit = connector_rep[i].concat(variable_rep_true[i])
+    #         f_lit = connector_rep[i].concat(variable_rep_false[i])
+    #         [strand.new_strand(t_lit) for _ in range(copies_per_literal)]
+    #         [strand.new_strand(f_lit) for _ in range(copies_per_literal)]
+    #         p.update(2)
+    #     [strand.new_strand(connector_rep[n]) for _ in range(copies_per_literal)]
+    #     p.update(1)
+    for i in trange(n, position=1, dynamic_ncols=True, leave=True, desc="populating component strands"):
+        t_lit = connector_rep[i].concat(variable_rep_true[i])
+        f_lit = connector_rep[i].concat(variable_rep_false[i])
+        for _ in trange(copies_per_literal, position=2, dynamic_ncols=True, leave=False,
+                        desc="Generating copies for variable " + str(i), miniters=500):
+            strand.new_strand(t_lit)
+            strand.new_strand(f_lit)
+        [strand.new_strand(connector_rep[i]) for _ in trange(copies_per_connector,
+                                            dynamic_ncols=True, leave=False, position=2,
+                                            desc="generating copies for connector " + str(i), miniters=500)]
+    # generate additional connector
+    [strand.new_strand(connector_rep[n]) for _ in trange(copies_per_connector,
+                                                         dynamic_ncols=True, leave=False, position=2,
+                                                         desc="generating copies for final connector", miniters=500)]
+
 
     for rep in tqdm(complement_rep, position=1,
                     desc="populating complement strands", dynamic_ncols=True, leave=True):
@@ -175,7 +192,7 @@ def init_3sat(formula: Formula) -> int:
                     for that variable is true of false respectively.
     :return: number of variables in formula
     """
-    with tqdm(total=5, desc="Initialization", leave=False, position=1) as prog:
+    with tqdm(total=5, desc="Initialization", leave=False, position=1, dynamic_ncols=True) as prog:
         prog.set_postfix_str("validating input")
         n = validate_formula(formula)
         prog.update(1)

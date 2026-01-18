@@ -16,7 +16,7 @@ type Formula = List[Clause]
 
 # constants
 DEAD_THRESHOLD = 0.5    # If dead strands/bindings fraction is above this threshold, reindex
-PCR_REPS = 20
+PCR_REPS = 5
 SETTLE_DIFF = 2         # if difference (in number of strand or binds) is below this between steps, it's settled
 SETTLE_ITER = 3         # If sample is settled (as defined above) for this many iterations, stop the step_until_settled run
 
@@ -60,9 +60,9 @@ def initial_selection(n:int) -> None:
     # filter by beginning and end
     copies_per_strand = ceil(SATinit.T / 2)
     mag_strands = SAT_routines.generate_init_selection_magnetic_strands(n)
-    with tqdm(mag_strands, desc="adding magnetized strands", position=1, leave=False) as prog:
+    with tqdm(mag_strands, desc="adding magnetized strands", position=1, leave=False, dynamic_ncols=True) as prog:
         for seq in prog:
-            [strand.new_strand(seq, True) for _ in trange(copies_per_strand, position=2, leave=False,
+            [strand.new_strand(seq, True) for _ in trange(copies_per_strand, position=2, leave=False, dynamic_ncols=True,
                                                           desc="generating copies of strand", miniters=100)]
     temperature = 55
     settle()
@@ -76,7 +76,8 @@ def run(formula: Formula) -> bool:
     global temperature
     # initialize experiment
     n = SATinit.init_3sat(formula)  # n is the number of variables
-    with tqdm(total=5, desc="Running", leave=True, position=0) as p:
+
+    with tqdm(total=5, desc="Running", leave=True, position=0, dynamic_ncols=True) as p:
         p.set_postfix_str("Allowing strands to bind and anneal into candidate solutions")
         temperature = 75        # set for annealing
         settle()                # allow initial strands to bind into full strands representing solutions
@@ -95,7 +96,7 @@ def run(formula: Formula) -> bool:
         p.update(1)
 
         p.set_postfix_str("Go over every clause in the formula and exclude all strands that do not satisfy it")
-        with tqdm(formula, position=1, leave=False, desc="Filtering by clause") as formula_prog:
+        with tqdm(formula, position=1, leave=False, desc="Filtering by clause", dynamic_ncols=True) as formula_prog:
             for clause in formula_prog:
                 if strand.empty_sample():
                     return False    # if sample becomes empty, we can return False right away
