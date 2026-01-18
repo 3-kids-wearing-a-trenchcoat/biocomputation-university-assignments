@@ -175,7 +175,7 @@ def init_3sat(formula: Formula) -> int:
                     for that variable is true of false respectively.
     :return: number of variables in formula
     """
-    with tqdm(total=5, desc="Initialization", leave=False, position=0) as prog:
+    with tqdm(total=5, desc="Initialization", leave=False, position=1) as prog:
         prog.set_postfix_str("validating input")
         n = validate_formula(formula)
         prog.update(1)

@@ -274,3 +274,7 @@ def get_entry_num() -> int:
 
 def get_active_num() -> int:
     return _active.count()
+
+def empty_sample() -> bool:
+    """returns 'True' if no strands are in the sample, otherwise 'False'"""
+    return _active.all() == 0

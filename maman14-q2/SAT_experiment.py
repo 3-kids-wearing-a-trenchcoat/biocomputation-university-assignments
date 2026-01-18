@@ -71,5 +71,51 @@ def initial_selection(n:int) -> None:
     settle()
     magnetic.magnetic_selection(True)   # remove magnetic strands from sample
 
-def run(formula: Formula) -> None:
+def run(formula: Formula) -> bool:
+    """Main Experiment sequence. returns 'True' iff formula is satisfiable"""
+    global temperature
+    # initialize experiment
+    n = SATinit.init_3sat(formula)  # n is the number of variables
+    with tqdm(total=5, desc="Running", leave=True, position=0) as p:
+        p.set_postfix_str("Allowing strands to bind and anneal into candidate solutions")
+        temperature = 75        # set for annealing
+        settle()                # allow initial strands to bind into full strands representing solutions
+        p.update(1)
+
+        p.set_postfix_str("unraveling binds in preparation to initial filter")
+        # unravel binds in preparation for initial selection
+        temperature = 95
+        settle()
+        p.update(1)
+
+        p.set_postfix_str("select by expected length and possible start/end sequences")
+        # filter out all candidates that are not of the expected length or beginning/end possibilities
+        initial_selection(n)
+        PCR(PCR_REPS)
+        p.update(1)
+
+        p.set_postfix_str("Go over every clause in the formula and exclude all strands that do not satisfy it")
+        with tqdm(formula, position=1, leave=False, desc="Filtering by clause") as formula_prog:
+            for clause in formula_prog:
+                if strand.empty_sample():
+                    return False    # if sample becomes empty, we can return False right away
+                formula_prog.set_postfix_str("reindexing")
+                SAT_routines.check_and_reindex(DEAD_THRESHOLD)
+
+                formula_prog.set_postfix_str("magnetic selection")
+                magnetic_selection(clause)
+
+                PCR(PCR_REPS, 2)
+                formula_prog.set_postfix_str("PCR")
+        p.update(1)
+
+        if strand.empty_sample():
+            return False
+
+        p.set_postfix_str("once again filtering by expected length and possible start/end sequences")
+        initial_selection(n)
+        p.update(1)
+
+        return not strand.empty_sample()    # if sample is not empty, formula is satisfiable
+
 
