@@ -23,19 +23,21 @@ def get_unravel_probability(temperature:float, strengths:NDArray[np.float32]) ->
     remain_prob = strengths * (1 - (1 - STEEPNESS) * melt)
     return 1 - remain_prob
 
-def select_binds_to_unravel(temperature:float) -> NDArray[np.uint32]:
+def select_binds_to_unravel(temperature:float) -> NDArray[np.uint32]|None:
     """
     Select which binds to unravel as a function of temperature and strength
     :param temperature: temperature the sample is set to
     :return: ordered indexes of binds to unravel
     """
+    if _active.size < 2:
+        return None
     active_strengths = _strength[_active]                                         # get strengths of active binds
     active_unravel_probs = get_unravel_probability(temperature, active_strengths) # calc prob to unravel for each strand
     # According to the probabilities, choose which strands to unravel
     rand = np.random.rand(len(active_strengths))
     unravel_mask = rand <= active_unravel_probs
     # according to the unraveling mask, return indexes of binds to unravel
-    active_idx = np.nonzero(_active)
+    active_idx = np.nonzero(_active)[0]
     return active_idx[unravel_mask]
 
 def bulk_unravel(temperature:float) -> None:
@@ -43,5 +45,8 @@ def bulk_unravel(temperature:float) -> None:
     The probability of each binding to unravel is weighted by its strength. (stronger = less likely to unravel)"""
     _lock.acquire()
     to_unravel = select_binds_to_unravel(temperature)
+    if to_unravel is None:
+        _lock.release()
+        return
     _active[to_unravel] = False
     _lock.release()

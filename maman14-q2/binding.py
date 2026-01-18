@@ -26,19 +26,19 @@ from LazyLock import LazyLock
 
 # constants
 # MIN_OVERLAP:int = 3
-SEED_LEN = 3
+SEED_LEN = 6
 THREADS = 8     # maximum number of threads running concurrently when manually parallelizing work
 rng = np.random.default_rng()
 FLOAT_DTYPE = np.float32
 
 # binding data
-_A_id = np.empty(0, dtype=np.uint32)
-_A_start = np.empty(0, dtype=np.uint16)
-_B_id = np.empty(0, dtype=np.uint32)
-_B_start = np.empty(0, dtype=np.uint16)
-_length = np.empty(0, dtype=np.uint16)
-_strength = np.empty(0, dtype=np.float16)
-_active:NDArray[np.bool] = np.array(0, dtype=np.bool)   # active binds
+_A_id = np.array([], dtype=np.uint32)
+_A_start = np.array([], dtype=np.uint16)
+_B_id = np.array([], dtype=np.uint32)
+_B_start = np.array([], dtype=np.uint16)
+_length = np.array([], dtype=np.uint16)
+_strength = np.array([], dtype=np.float16)
+_active:NDArray[np.bool] = np.array([], dtype=np.bool)   # active binds
 _lock = RLock() # avoid race conditions as a result of parallel writes
 
 # functions
@@ -225,7 +225,8 @@ def bulk_bind(repetitions:int=10) -> None:
         start_a, start_b, bind_length, strength = binds[0], binds[1], binds[2], binds[3]
         # with ProcessPoolExecutor(max_workers=THREADS) as ex:
         #     bind_is_valid =list(ex.map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
-        bind_is_valid = list(map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
+        if _active.length > 0:
+            bind_is_valid = list(map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
         # add all found bindings that are possible
         [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
          for i in range(len(start_a)) if bind_is_valid[i]] # TODO: BAD AND SLOW
