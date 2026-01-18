@@ -9,9 +9,9 @@ import strand
 
 # constants
 NUCLEOTIDE_SYNTAX = ['T', 'G', 'C', 'A']
-T = 5e5             # Number of complete assemblies (solutions) I want to simulate
+T = 1e5             # Number of complete assemblies (solutions) I want to simulate
 SAFETY_FACTOR = 1       # Safety factor to account for inefficiencies
-MAX_COMP_ALPHA = 0.3    # Maximum ratio of complementary between any two representations
+MAX_COMP_ALPHA = 0.35    # Maximum ratio of complementary between any two representations
 
 # global vars
 # simulation settings
@@ -161,7 +161,7 @@ def populate_strands(n:int):
     #         p.update(2)
     #     [strand.new_strand(connector_rep[n]) for _ in range(copies_per_literal)]
     #     p.update(1)
-    for i in trange(n, position=1, dynamic_ncols=True, leave=True, desc="populating component strands"):
+    for i in trange(n, position=2, dynamic_ncols=True, leave=True, desc="populating component strands"):
         t_lit = connector_rep[i].concat(variable_rep_true[i])
         f_lit = connector_rep[i].concat(variable_rep_false[i])
         for _ in trange(copies_per_literal, position=2, dynamic_ncols=True, leave=False,
@@ -169,16 +169,16 @@ def populate_strands(n:int):
             strand.new_strand(t_lit)
             strand.new_strand(f_lit)
         [strand.new_strand(connector_rep[i]) for _ in trange(copies_per_connector,
-                                            dynamic_ncols=True, leave=False, position=2,
+                                            dynamic_ncols=True, leave=False, position=3,
                                             desc="generating copies for connector " + str(i), miniters=500)]
     # generate additional connector
     [strand.new_strand(connector_rep[n]) for _ in trange(copies_per_connector,
-                                                         dynamic_ncols=True, leave=False, position=2,
+                                                         dynamic_ncols=True, leave=False, position=3,
                                                          desc="generating copies for final connector", miniters=500)]
 
 
-    for rep in tqdm(complement_rep, position=1,
-                    desc="populating complement strands", dynamic_ncols=True, leave=True):
+    for rep in tqdm(complement_rep, position=2,
+                    desc="populating complement strands", dynamic_ncols=True, leave=False):
         [strand.new_strand(rep) for _ in range(copies_per_literal)]
 
 
