@@ -222,7 +222,7 @@ def bulk_bind(repetitions:int=10) -> None:
         # If it is, that binding is discarded
         # strand_locks = LazyLock()                                   # per-strand locks
         # f = partial(_validate_bind, strand_locks=strand_locks)      # map strand_locks to _validate_bind
-        start_a, start_b, bind_length, strength = zip(*binds)
+        start_a, start_b, bind_length, strength = binds[0], binds[1], binds[2], binds[3]
         # with ProcessPoolExecutor(max_workers=THREADS) as ex:
         #     bind_is_valid =list(ex.map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
         bind_is_valid = list(map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
