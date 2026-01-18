@@ -1,5 +1,5 @@
 from __future__ import annotations
-import binding, strand, anneal, unravel, magnetic, SATinit, sequences
+import binding, strand, anneal, unravel, magnetic, SATinit, sequences, PCR
 from SATinit import variable_rep_false, variable_rep_true, connector_rep, complement_rep
 from TwoBitArray import TwoBitArray
 from typing import List, Tuple
@@ -126,4 +126,21 @@ def generate_constraints(clause: Clause) -> Tuple[TwoBitArray, TwoBitArray, TwoB
     if var2 > 0:
         lit2 = connector_rep[var2 - 1].concat(lit2)
     return lit0, lit1, lit2
+
+def add_magnetic_strands_by_clause(clause: Clause, copies:int=strand.get_entry_num()/2):
+    """
+    Create magnetic strands out of the input clause and add them to the sample.
+    For each literal in the clause, two nucleotide sequences are created, one for the desired expression and
+    another for its complement.
+    :param clause: Tuple of 3 literals, each literal is (variable index, whether it needs to be True of False)
+    :param copies: Number of copies for each magnetic strand, defaults to half the number of living strands
+    :return:
+    """
+    seq0, seq1, seq2 = generate_constraints(clause)
+    for _ in trange(copies, desc="adding magnetized strands", position=1, leave=False):
+        strand.new_strand(seq0, True)
+        strand.new_strand(seq1, True)
+        strand.new_strand(seq2, True)
+
+# actual selection and clearing should be done in SAT_experiment
 
