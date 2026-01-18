@@ -139,8 +139,11 @@ def add_magnetic_strands_by_clause(clause: Clause, copies:int=strand.get_entry_n
     seq0, seq1, seq2 = generate_constraints(clause)
     for _ in trange(copies, desc="adding magnetized strands", position=1, leave=False):
         strand.new_strand(seq0, True)
+        strand.new_strand(~seq0, True)
         strand.new_strand(seq1, True)
+        strand.new_strand(~seq1, True)
         strand.new_strand(seq2, True)
+        strand.new_strand(~seq2, True)
 
 # actual selection and clearing should be done in SAT_experiment
 
