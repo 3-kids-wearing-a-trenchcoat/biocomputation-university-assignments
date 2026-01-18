@@ -107,15 +107,24 @@ def get_ids_bound_to_length(length:int) -> NDArray[np.uint32]:
 def electrophoresis(length: int) -> None:
     """Remove from sample all strands that are not of the specified length or are bound (directly or indirectly)
     To a strand of the specified length."""
-    # Select strands to discard
-    idx = np.arange(strand.get_length().size, dtype=np.uint32)
-    keep_mask = np.in1d(idx, get_ids_bound_to_length(length), assume_unique=True)
-    discard_mask = ~keep_mask
-    discard_ids = np.nonzero(discard_mask)[0].astype(np.uint32)
-    # delete binds with strands to discard
-    binding.delete_all_with_strand_id(discard_ids)
-    # delete all strands to discard
-    strand.bulk_delete(discard_ids)
+    with tqdm(total=3, desc="gel electrophoresis", position=1, dynamic_ncols=True, leave=False) as p:
+        p.set_postfix_str("Selecting by length")
+        # Select strands to discard
+        idx = np.arange(strand.get_length().size, dtype=np.uint32)
+        keep_mask = np.in1d(idx, get_ids_bound_to_length(length), assume_unique=True)
+        discard_mask = ~keep_mask
+        discard_ids = np.nonzero(discard_mask)[0].astype(np.uint32)
+        p.update(1)
+
+        p.set_postfix_str("remove bindings of wrong length")
+        # delete binds with strands to discard
+        binding.delete_all_with_strand_id(discard_ids)
+        p.update(1)
+
+        p.set_postfix_str("remove strands of wrong length")
+        # delete all strands to discard
+        strand.bulk_delete(discard_ids)
+        p.update(1)
 
 # ========== magnetic selection ==========
 type Literal = Tuple[int, bool]                 # (variable number, literal is True)
