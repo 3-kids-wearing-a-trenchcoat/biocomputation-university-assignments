@@ -68,8 +68,16 @@ def step_until_settle(temperature: int, diff: int, stop_iter: int, with_annealin
     with tqdm(desc="Letting sample settle", position=1, leave=False, unit="iters") as p:
         while settled_iter < stop_iter:
             new_nums = step(temperature, with_annealing, True, 2)
-            p.set_postfix(strand_num_change=(strand_num - new_nums[0]),
-                          bind_num_change=(bind_num - new_nums[1]),
+
+            strand_diff, bind_diff = strand_num - new_nums[0], bind_num - new_nums[1]
+            if strand_diff <= diff or bind_diff <= diff:
+                settled_iter += 1
+            else:
+                settled_iter = 0
+
+            p.set_postfix(strand_num_change=strand_diff,
+                          bind_num_change=bind_diff,
+                          settled_iterations=settled_iter,
                           refresh=False)
             p.update()
             strand_num, bind_num = new_nums

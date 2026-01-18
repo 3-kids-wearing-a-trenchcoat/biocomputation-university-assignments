@@ -23,6 +23,27 @@ SETTLE_ITER = 3         # If sample is settled (as defined above) for this many 
 temperature = 55
 
 # functions
+def magnetic_selection(clause: Clause) -> None:
+    """
+    Complete magnetic selection routine.
+    1. Generate magnetic strands according to the input clause
+    2. Insert many copies of these strands into the sample
+    3. Allow the magnetic strands to bind and settle
+    4. Remove from the sample all strands which are neither magnetic nor bound (directly or indirectly) to a magnetic strand
+    5. Undo all binds by heating the sample
+    6. Remove all magnetic strands from sample
+    """
+    global temperature
+    # remove all not selected magnetically
+    SAT_routines.add_magnetic_strands_by_clause(clause)
+    temperature = 55
+    SAT_routines.step_until_settle(temperature, SETTLE_DIFF, SETTLE_ITER)
+    magnetic.magnetic_selection(False)
+    # clear sample of magnetic strands
+    temperature = 95
+    SAT_routines.step_until_settle(temperature, SETTLE_DIFF, SETTLE_ITER)
+    magnetic.magnetic_selection(True)
+
 
 # TODO: implement magnetic selection routine
 # TODO: Implement magnetic strand removal routine, which heats the sample to unbind all and then removes magnetic strands
