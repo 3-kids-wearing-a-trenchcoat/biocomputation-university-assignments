@@ -20,11 +20,13 @@ from numpy.typing import NDArray
 from threading import RLock
 from typing import List, Tuple
 import strand
+from tqdm import trange, tqdm
+from concurrent.futures import ProcessPoolExecutor
 
 # constants
 # MIN_OVERLAP:int = 3
-SEED_LEN = 6
-THREADS = 8     # maximum number of threads running concurrently when manually parallelizing work
+SEED_LEN = 14
+# THREADS = 8     # maximum number of threads running concurrently when manually parallelizing work
 rng = np.random.default_rng()
 FLOAT_DTYPE = np.float32
 
@@ -68,7 +70,8 @@ def calc_strength(id_a:int|NDArray, start_a:int|NDArray,
         seq_a, seq_b = strand.get_seq(id_a), strand.get_seq(id_b)
         bind_seq_a, bind_seq_b = seq_a[start_a: start_a + length], seq_b[start_b: start_b + length]
         comp = (bind_seq_a ^ bind_seq_b).count()
-        return comp / length
+        # return comp / length
+        return (comp * 2) / (_length[id_a] + _length[id_b])
 
     # if array of binds (assumed to be of the same length and aligned by id)
     length_arr = strand.get_length()
@@ -184,42 +187,53 @@ def _validate_bind(id_a:int, start_a:int, id_b:int, start_b:int, length:int) -> 
     if is_bound_at(id_a, start_a, length) or is_bound_at(id_b, start_b, length):
         return False
     # check if A and B are already bound to one another at any point
+    if _A_id.size == 0: # if empty
+        return True
     if (((_A_id == id_a) & (_B_id == id_b)) | ((_A_id == id_b) & (_B_id == id_a))).any():
         return False
     return True
 
-def bulk_bind(repetitions:int=10) -> None:
+def bulk_bind(repetitions:int=1) -> None:
     """
     Randomly bind strands to one another.
     This function mimics (or should, at least) the natural binding behavior of DNA strands.
     At each iteration, only some of the strands will form new bonds
     :param repetitions: number of times to repeat this process
     """
-    for rep in range(repetitions):  # repeat the bulk bind process `repetitions` times
+    # for _ in trange(repetitions, desc="binding process", position=3, dynamic_ncols=True, leave=False):  # repeat the bulk bind process `repetitions` times
         # list of strands that will choose a partner (initialized to active ones)
         # candidates = np.nonzero(_active)[0].astype(np.uint32)
-        candidates = np.nonzero(strand.get_active_mask())[0].astype(np.uint32)
-        n = candidates.size
-        if n < 2:   # if n == 0 or n == 1, no further bindings are possible
-            return
-        # each candidate chooses a *different* candidate at random, using the vectorized shift trick
-        r = np.random.randint(0, n - 1, size=n) # generate random integers from range [0, n-2]
-        # convert each r into an index by skipping one spot when r >= i
-        i = np.arange(n)
-        idx = r + (r >= i)
-        # convert random idx choices into a random value from candidates, importantly, one that isn't the same strand.
-        choices = candidates[idx].astype(candidates.dtype)
+    candidates = np.nonzero(strand.get_active_mask())[0].astype(np.uint32)
+    n = candidates.size
+    if n < 2:   # if n == 0 or n == 1, no further bindings are possible
+        return
+    # each candidate chooses a *different* candidate at random, using the vectorized shift trick
+    r = np.random.randint(0, n - 1, size=n) # generate random integers from range [0, n-2]
+    # convert each r into an index by skipping one spot when r >= i
+    i = np.arange(n)
+    idx = r + (r >= i)
+    # convert random idx choices into a random value from candidates, importantly, one that isn't the same strand.
+    choices = candidates[idx].astype(candidates.dtype)
 
-        # For each candidate-choice pair, pick a binding at random weighted by strength
-        binds: List[Tuple[int, int, int, float]] = list(map(_choose_binding, candidates, choices))
-        # For each pair and their chosen binding, check if the binding area in either strand is not already bound
-        # If it is, that binding is discarded
-        start_a, start_b, bind_length, strength = binds[0], binds[1], binds[2], binds[3]
-        if _active.size > 0:
-            bind_is_valid = list(map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
-            # add all found bindings that are possible
-            [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
-             for i in range(len(start_a)) if bind_is_valid[i]]
+    # For each candidate-choice pair, pick a binding at random weighted by strength
+    # binds: List[Tuple[int, int, int, float]] = list(map(_choose_binding, candidates, choices))
+    binds: List[Tuple[int, int, int, float]] = [_choose_binding(a, b) for a, b in zip(candidates, choices)]
+    # For each pair and their chosen binding, check if the binding area in either strand is not already bound
+    # If it is, that binding is discarded
+    # start_a, start_b, bind_length, strength = binds[0], binds[1], binds[2], binds[3]
+    start_a = [bind[0] for bind in binds if bind is not None]
+    start_b = [bind[1] for bind in binds if bind is not None]
+    bind_length = [bind[2] for bind in binds if bind is not None]
+    strength = [bind[3] for bind in binds if bind is not None]
+    # if _active.size > 0:
+    # bind_is_valid = list(map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
+    bind_is_valid = [_validate_bind(candidate, a, choice, b, length) for candidate, a, choice, b, length in zip(candidates, start_a, choices, start_b, bind_length)]
+    # add all found bindings that are possible
+    [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
+     for i in range(len(start_a))
+     # if bind_is_valid[i]]
+     if _validate_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i])]
+
 
 # @njit
 def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[np.uint32], NDArray[np.uint16],

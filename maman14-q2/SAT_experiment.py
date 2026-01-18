@@ -14,8 +14,8 @@ type Formula = List[Clause]
 
 # constants
 DEAD_THRESHOLD = 0.5    # If dead strands/bindings fraction is above this threshold, reindex
-PCR_REPS = 3
-SETTLE_DIFF = 2         # if difference (in number of strand or binds) is below this between steps, it's settled
+PCR_REPS = 5
+SETTLE_DIFF = 100         # if difference (in number of strand or binds) is below this between steps, it's settled
 SETTLE_ITER = 3         # If sample is settled (as defined above) for this many iterations, stop the step_until_settled run
 
 # global variables
@@ -23,7 +23,7 @@ temperature = 55
 
 # functions
 def settle() -> None:
-    SAT_routines.step_until_settle(temperature, SETTLE_DIFF, SETTLE_ITER, temperature == 75)
+    SAT_routines.step_until_settle(temperature, SETTLE_DIFF, SETTLE_ITER, temperature == 75, temperature > 90)
 
 def magnetic_selection(clause: Clause) -> None:
     """

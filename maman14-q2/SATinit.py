@@ -9,7 +9,7 @@ import strand
 
 # constants
 NUCLEOTIDE_SYNTAX = ['T', 'G', 'C', 'A']
-T = 1e5             # Number of complete assemblies (solutions) I want to simulate
+T = 1e3             # Number of complete assemblies (solutions) I want to simulate
 SAFETY_FACTOR = 1       # Safety factor to account for inefficiencies
 MAX_COMP_ALPHA = 0.35    # Maximum ratio of complementary between any two representations
 

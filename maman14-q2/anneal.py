@@ -32,6 +32,7 @@ def _keep_only_unique(pairs: NDArray, hosts: NDArray|None = None) -> NDArray|Tup
     first_row_flat = first_row_of_unique[idx_into_unique]   # length 2*N
     # reshape back to (N,2) and require both elements' first_row == current_row
     first_row_pairs = first_row_flat.reshape(N,2)
+
     row_indices = np.arange(N)[:,None]
     keep_mask = np.all(first_row_pairs == row_indices, axis=1)  # shape (N,)
 
@@ -195,7 +196,8 @@ def bulk_anneal() -> None:
         bound_ids = np.append(bound_ids, func_output[0])
         bind_start = np.append(bind_start, func_output[1])
         length = np.append(length, func_output[2])
-        hosts = np.append(hosts, np.full(bound_ids.size, host_id))
+        # hosts = np.append(hosts, np.full(bound_ids.shape[0], host_id))
+        hosts = np.append(hosts, host_id)
     # Candidates are those whose end position is immediately before the another's start position
     candidate_mask = (bind_start[:-1] + length[:-1]) == bind_start[1:]
     candidates = np.column_stack((bound_ids[:-1][candidate_mask], bound_ids[1:][candidate_mask]))

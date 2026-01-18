@@ -24,7 +24,7 @@ def check_and_reindex(threshold:float) -> None:
         binding.reindex(new_ids)            # Will also update IDs if strand was reindexed
 
 # ========== step ==========
-def step(temperature: int, perform_annealing:bool = False, report:bool = False, tqdm_pos:int = 1) -> None|Tuple[int, int]:
+def step(temperature: int, perform_annealing:bool = False, perform_unraveling = False, report:bool = False, tqdm_pos:int = 1) -> None|Tuple[int, int]:
     """
     Perform a single "step" in the simulation that is analogous to letting the sample "do its thing" uninterrupted.
     These steps include stochastic binding, stochastic annealing and stochastic unbinding.
@@ -47,15 +47,16 @@ def step(temperature: int, perform_annealing:bool = False, report:bool = False, 
         p.set_postfix_str("Binding")
         binding.bulk_bind(1)
         p.update(1)
-        p.set_postfix_str("Unravelling")
-        unravel.bulk_unravel(temperature)
+        if perform_unraveling:
+            p.set_postfix_str("Unravelling")
+            unravel.bulk_unravel(temperature)
         p.update(1)
     if report:
         return strand.get_active_num(), binding.get_active_num()
     else:
         return None
 
-def step_until_settle(temperature: int, diff: int, stop_iter: int, with_annealing:bool = False) -> None:
+def step_until_settle(temperature: int, diff: int, stop_iter: int, with_annealing:bool = False, with_unraveling:bool = False) -> None:
     """
     Run 'step()' until the sample is "settled" for several consecutive iterations
     :param temperature: Temperature of the sample
@@ -66,21 +67,23 @@ def step_until_settle(temperature: int, diff: int, stop_iter: int, with_annealin
     """
     settled_iter = 0
     strand_num, bind_num = strand.get_active_num(), binding.get_active_num()
-    with tqdm(desc="Letting sample settle", position=1, leave=False, unit="iters") as p:
+    with tqdm(desc="Letting sample settle", position=2, leave=False, unit="iters") as p:
         while settled_iter < stop_iter:
-            new_nums = step(temperature, with_annealing, True, 2)
+            new_nums = step(temperature, with_annealing, with_unraveling,True, 2)
 
-            strand_diff, bind_diff = strand_num - new_nums[0], bind_num - new_nums[1]
+            strand_diff, bind_diff = abs(strand_num - new_nums[0]), abs(bind_num - new_nums[1])
             if strand_diff <= diff or bind_diff <= diff:
                 settled_iter += 1
             else:
                 settled_iter = 0
 
-            p.set_postfix(strand_num_change=strand_diff,
+            p.set_postfix(total_strands=strand.get_active_num(),
+                          total_binds=binding.get_active_num(),
+                          strand_num_change=strand_diff,
                           bind_num_change=bind_diff,
                           settled_iterations=settled_iter,
                           refresh=False)
-            p.update()
+            p.update(1)
             strand_num, bind_num = new_nums
 
 # ========== gel electrophoresis ==========

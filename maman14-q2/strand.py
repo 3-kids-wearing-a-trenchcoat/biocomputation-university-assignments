@@ -152,8 +152,8 @@ def _extend_seed(id_a:int, nucleation_index_a:int, id_b:int, nucleation_index_b:
     bind_seq_a = sequences.get(_offset[id_a] + start_a, length)
     bind_seq_b = sequences.get(_offset[id_b] + start_b, length)
     comp = (bind_seq_a ^ bind_seq_b).count()  # number of complementary pairs, obviously every pair has 2 nucleotides
-    # strength = (comp * 2) / (len_a + len_b)   # fraction of all nucleotides in both strands that are bound to a complementary
-    strength = comp / length # fraction of nucleotides in binding sequence that are complementary
+    strength = (comp * 2) / (len_a + len_b)   # fraction of all nucleotides in both strands that are bound to a complementary
+    # strength = comp / length # fraction of nucleotides in binding sequence that are complementary
     return start_a, start_b, length, strength
 
 
