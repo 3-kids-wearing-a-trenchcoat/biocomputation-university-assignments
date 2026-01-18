@@ -175,9 +175,20 @@ def init_3sat(formula: Formula) -> int:
                     for that variable is true of false respectively.
     :return: number of variables in formula
     """
-    n = validate_formula(formula)
-    set_dna_rep_params(n)
-    generate_unique_representations(n)
-    generate_complementary_strands(n)
-    populate_strands(n)
-    return n
+    with tqdm(total=5, desc="Initialization", leave=False, position=0) as prog:
+        prog.set_postfix_str("validating input")
+        n = validate_formula(formula)
+        prog.update(1)
+        prog.set_postfix_str("setting dna representation parameters")
+        set_dna_rep_params(n)
+        prog.update(1)
+        prog.set_postfix_str("generating unique representations")
+        generate_unique_representations(n)
+        prog.update(1)
+        prog.set_postfix_str("generating complementary strands")
+        generate_complementary_strands(n)
+        prog.update(1)
+        prog.set_postfix_str("Populating sample with elementary strands")
+        populate_strands(n)
+        prog.update(1)
+        return n
