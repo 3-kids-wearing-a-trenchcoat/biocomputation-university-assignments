@@ -225,11 +225,11 @@ def bulk_bind(repetitions:int=10) -> None:
         start_a, start_b, bind_length, strength = binds[0], binds[1], binds[2], binds[3]
         # with ProcessPoolExecutor(max_workers=THREADS) as ex:
         #     bind_is_valid =list(ex.map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
-        if _active.length > 0:
+        if _active.size > 0:
             bind_is_valid = list(map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
-        # add all found bindings that are possible
-        [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
-         for i in range(len(start_a)) if bind_is_valid[i]] # TODO: BAD AND SLOW
+            # add all found bindings that are possible
+            [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
+             for i in range(len(start_a)) if bind_is_valid[i]] # TODO: BAD AND SLOW
 
 # @njit
 def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[np.uint32], NDArray[np.uint16],

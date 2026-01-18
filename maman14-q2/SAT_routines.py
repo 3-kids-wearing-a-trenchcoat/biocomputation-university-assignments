@@ -38,11 +38,12 @@ def step(temperature: int, perform_annealing:bool = False, report:bool = False, 
              1. Number of (living) strands in the sample after the step ran its course
              2. Number of (active) binds in the sample after the step ran its course
     """
-    with tqdm(total=3, leave=False, desc="simulation step", position=1) as p:
+    tqdm_total = 3 if perform_annealing else 2
+    with tqdm(total=tqdm_total, leave=False, desc="simulation step", position=1) as p:
         if perform_annealing:
             p.set_postfix_str("Annealing")
             anneal.bulk_anneal()
-        p.update(1)
+            p.update(1)
         p.set_postfix_str("Binding")
         binding.bulk_bind(1)
         p.update(1)
@@ -107,7 +108,7 @@ def electrophoresis(length: int) -> None:
     """Remove from sample all strands that are not of the specified length or are bound (directly or indirectly)
     To a strand of the specified length."""
     # Select strands to discard
-    idx = np.arange(strand.get_length, dtype=np.uint32)
+    idx = np.arange(strand.get_length(), dtype=np.uint32)
     keep_mask = np.in1d(idx, get_ids_bound_to_length(length), assume_unique=True)
     discard_mask = ~keep_mask
     discard_ids = np.nonzero(discard_mask)[0].astype(np.uint32)
