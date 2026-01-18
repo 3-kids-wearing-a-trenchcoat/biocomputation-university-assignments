@@ -179,7 +179,9 @@ def populate_strands(n:int):
 
     for rep in tqdm(complement_rep, position=2,
                     desc="populating complement strands", dynamic_ncols=True, leave=False):
-        [strand.new_strand(rep) for _ in range(copies_per_literal)]
+        [strand.new_strand(rep) for _ in trange(copies_per_connector,
+                                                         dynamic_ncols=True, leave=False, position=3,
+                                                         desc="generating copies of complement", miniters=500)]
 
 
 def init_3sat(formula: Formula) -> int:
