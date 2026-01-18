@@ -205,7 +205,7 @@ def bulk_anneal() -> None:
     for host_id in strand.get_living_ids():
         # bound_ids, bind_start, length = get_bound_strands(host_id)
         func_output = get_bound_strands(host_id)
-        if not func_output[0]:  # if host has no bindings
+        if func_output[0].size == 0:  # if host has no bindings
             continue            # skip
         bound_ids = np.append(bound_ids, func_output[0])
         bind_start = np.append(bind_start, func_output[1])
