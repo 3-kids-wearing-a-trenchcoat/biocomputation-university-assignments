@@ -301,6 +301,10 @@ def get_entry_num() -> int:
 def get_active_num() -> int:
     return np.count_nonzero(_active)[0]
 
+def get_all_bound_strands() -> NDArray[np.uint32]:
+    """Get IDs of all strands that are bound (in order)"""
+    return np.union1d(_A_id[_active], _B_id[_active])
+
 
 # ========== RESTRICTION ENZYME FUNCTIONS ==========
 # TODO: Implement restriction enzymes
