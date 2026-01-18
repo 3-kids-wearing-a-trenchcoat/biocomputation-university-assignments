@@ -3,6 +3,7 @@
 from __future__ import annotations
 import binding, strand, anneal, unravel, magnetic, SATinit, SAT_routines
 from SATinit import variable_rep_false, variable_rep_true, connector_rep, complement_rep
+from PCR import PCR
 from TwoBitArray import TwoBitArray
 from typing import List, Tuple
 from tqdm import tqdm, trange
@@ -42,8 +43,6 @@ def generate_constraints(clause: Clause) -> Tuple[TwoBitArray, TwoBitArray, TwoB
 
 # TODO: use "step" in such a way that annealing depends on temperature
 
-# TODO: Implement primer seeding
-# TODO: Implement PCR routine, that is, throw in primers and let them bind
 # TODO: implement "initial selection" routine which filters by strand size, start with a_0 x_0 and end with x_{n-1} a_n
 
 
