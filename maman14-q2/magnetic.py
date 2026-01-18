@@ -5,8 +5,8 @@ import binding
 import strand
 
 # constants
-MAG_SELECTION_FAILURE_PROB = 1e-4
-PROCESSES = 8   # max number of ProcessPoolExecutor workers that can run simultaneously
+# MAG_SELECTION_FAILURE_PROB = 1e-6
+# PROCESSES = 8   # max number of ProcessPoolExecutor workers that can run simultaneously
 
 # functions
 def find_all_attached_to_magnetic() -> NDArray[np.uint32]:

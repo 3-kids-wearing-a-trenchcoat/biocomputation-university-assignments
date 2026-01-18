@@ -253,9 +253,16 @@ def get_length() -> NDArray:
 def is_magnetic(strand_id:int) -> bool:
     return _magnetic[strand_id] == 1
 
-def get_magnetic_id() -> NDArray[np.uint32]:
-    """get IDs of all living magnetic strands"""
-    return np.nonzero(get_magnetic_mask())[0].astype(np.uint32)
+MAG_SELECTION_FAILURE_PROB = 1e-6
+
+def get_magnetic_id(failure_prob:float=MAG_SELECTION_FAILURE_PROB) -> NDArray[np.uint32]:
+    """get IDs of all living magnetic strands
+    :param failure_prob: probability of magnetic strand to not be selected"""
+    magnetic_mask = get_magnetic_mask()
+    failure = np.random.default_rng().random(len(magnetic_mask)) <= failure_prob
+    magnetic_mask[failure] = False
+    return np.nonzero(magnetic_mask)[0].astype(np.uint32)
+    # return np.nonzero(get_magnetic_mask())[0].astype(np.uint32)
 
 def get_magnetic_mask() -> NDArray[np.bool]:
     return np.fromiter(_magnetic & _active, dtype=np.bool)
