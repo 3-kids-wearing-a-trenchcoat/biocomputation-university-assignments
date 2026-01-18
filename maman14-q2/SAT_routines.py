@@ -108,7 +108,7 @@ def electrophoresis(length: int) -> None:
     """Remove from sample all strands that are not of the specified length or are bound (directly or indirectly)
     To a strand of the specified length."""
     # Select strands to discard
-    idx = np.arange(strand.get_length(), dtype=np.uint32)
+    idx = np.arange(strand.get_length().size, dtype=np.uint32)
     keep_mask = np.in1d(idx, get_ids_bound_to_length(length), assume_unique=True)
     discard_mask = ~keep_mask
     discard_ids = np.nonzero(discard_mask)[0].astype(np.uint32)

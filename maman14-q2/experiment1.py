@@ -8,4 +8,8 @@ formula = [(    (0, True), (1, True), (2, True) ),
                 ((0, True), (1, False), (2, True))]
 
 if __name__ == "__main__":
-    run(formula)
+    satisfiable = run(formula)
+    if satisfiable:
+        print("FORMULA IS SATISFIABLE")
+    else:
+        print("FORMULA IS NOT SATISFIABLE")
