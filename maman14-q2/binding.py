@@ -114,6 +114,10 @@ def delete_bind(bind_id:int) -> None:
     _active[bind_id] = False
     _lock.release()
 
+def get_dead_fraction() -> float:
+    """Get fraction of strand entries which are dead"""
+    return np.count_nonzero(_active) / len(_active)
+
 def reindex(new_strand_ids:NDArray[np.int64]|None = None) -> None:
     """
     Compactify data by removing all inactive strands
