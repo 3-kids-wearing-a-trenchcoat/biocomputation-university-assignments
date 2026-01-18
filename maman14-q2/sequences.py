@@ -46,7 +46,7 @@ def prune_inactive() -> None:
     _lock.release()
 
 def get(offset:int, length:int) -> TwoBitArray:
-    return _seq[offset:length]
+    return _seq[offset: offset + length]
 
 def make_inactive(offset:int, length: int) -> None:
     # locking may be unnecessary here

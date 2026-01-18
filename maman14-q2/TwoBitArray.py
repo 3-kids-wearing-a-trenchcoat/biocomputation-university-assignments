@@ -92,7 +92,7 @@ class TwoBitArray:
             start, stop, step = key.indices(len(self))
             output = TwoBitArray()
             output.to_syntax, output.from_syntax = self.to_syntax, self.from_syntax
-            output.left, output.right = self.left[start,stop,step], self.right[start,stop,step]
+            output.left, output.right = self.left[start:stop:step], self.right[start:stop:step]
             return output
         if isinstance(key, bitarray):   # by mask
             return self.get_by_mask(key)

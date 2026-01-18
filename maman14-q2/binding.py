@@ -26,7 +26,7 @@ from LazyLock import LazyLock
 
 # constants
 # MIN_OVERLAP:int = 3
-SEED_LEN = 6
+SEED_LEN = 3
 THREADS = 8     # maximum number of threads running concurrently when manually parallelizing work
 rng = np.random.default_rng()
 FLOAT_DTYPE = np.float32
@@ -201,7 +201,8 @@ def bulk_bind(repetitions:int=10) -> None:
     """
     for rep in range(repetitions):  # repeat the bulk bind process `repetitions` times
         # list of strands that will choose a partner (initialized to active ones)
-        candidates = np.nonzero(_active)[0].astype(np.uint32)
+        # candidates = np.nonzero(_active)[0].astype(np.uint32)
+        candidates = np.nonzero(strand.get_active_mask())[0].astype(np.uint32)
         n = candidates.size
         if n < 2:   # if n == 0 or n == 1, no further bindings are possible
             return
@@ -214,17 +215,17 @@ def bulk_bind(repetitions:int=10) -> None:
         choices = candidates[idx].astype(candidates.dtype)
 
         # For each candidate-choice pair, pick a binding at random weighted by strength
-        # with ThreadPoolExecutor(max_workers=THREADS) as ex:
-        with ProcessPoolExecutor(max_workers=THREADS) as ex:
-            binds: List[Tuple[int, int, int, float]] = list(ex.map(_choose_binding, candidates, choices))
+        # with ProcessPoolExecutor(max_workers=THREADS) as ex:
+        #     binds: List[Tuple[int, int, int, float]] = list(ex.map(_choose_binding, candidates, choices))
+        binds: List[Tuple[int, int, int, float]] = list(map(_choose_binding, candidates, choices))
         # For each pair and their chosen binding, check if the binding area in either strand is not already bound
         # If it is, that binding is discarded
-        strand_locks = LazyLock()                                   # per-strand locks
+        # strand_locks = LazyLock()                                   # per-strand locks
         # f = partial(_validate_bind, strand_locks=strand_locks)      # map strand_locks to _validate_bind
         start_a, start_b, bind_length, strength = zip(*binds)
-        # with ThreadPoolExecutor(max_workers=THREADS) as ex:
-        with ProcessPoolExecutor(max_workers=THREADS) as ex:
-            bind_is_valid =list(ex.map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
+        # with ProcessPoolExecutor(max_workers=THREADS) as ex:
+        #     bind_is_valid =list(ex.map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
+        bind_is_valid = list(map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
         # add all found bindings that are possible
         [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
          for i in range(len(start_a)) if bind_is_valid[i]] # TODO: BAD AND SLOW
