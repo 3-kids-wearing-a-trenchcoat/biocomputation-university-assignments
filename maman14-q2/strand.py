@@ -27,8 +27,10 @@ def get_seq(strand_id:int, decoded:bool = False) -> TwoBitArray|List:
         return sequences.decode(offset, length)
     return sequences.get(offset, length)
 
-def new_strand(input_seq: TwoBitArray|Iterable, magnetic:bool=False) -> int:
+def new_strand(input_seq: TwoBitArray|Iterable, magnetic:bool=False) -> int|None:
     global _offset, _length, _active
+    if input_seq is None:
+        return None
     _lock.acquire()
     offset, length = sequences.seq_append(input_seq)
     _offset, _length = np.append(_offset, offset), np.append(_length, length)

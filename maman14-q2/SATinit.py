@@ -165,7 +165,7 @@ def populate_strands(n:int):
         [strand.new_strand(rep) for _ in range(copies_per_literal)]
 
 
-def init_3sat(formula: Formula) -> None:
+def init_3sat(formula: Formula) -> int:
     """
     Initialize the 3SAT problem according to the formula.
     It is assumed the input formula is in 3SAT form, meaning clauses are all in an AND relation literals
@@ -173,9 +173,11 @@ def init_3sat(formula: Formula) -> None:
     :param formula: List of clauses. Each Clause is a length 3 tuple of literals.
                     Each literal is an (int, bool) tuple representing the variable number and whether the literal
                     for that variable is true of false respectively.
+    :return: number of variables in formula
     """
     n = validate_formula(formula)
     set_dna_rep_params(n)
     generate_unique_representations(n)
     generate_complementary_strands(n)
     populate_strands(n)
+    return n

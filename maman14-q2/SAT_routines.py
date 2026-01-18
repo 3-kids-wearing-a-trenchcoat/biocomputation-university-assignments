@@ -153,5 +153,15 @@ def add_magnetic_strands_by_clause(clause: Clause, copies:int=strand.get_entry_n
         strand.new_strand(seq2, True)
         strand.new_strand(~seq2, True)
 
+def generate_init_selection_magnetic_strands(n:int) -> List[TwoBitArray]:
+    start_seq_t = connector_rep[0].concat(variable_rep_true[0]).concat(connector_rep[1])
+    start_seq_f = connector_rep[0].concat(variable_rep_false[0]).concat(connector_rep[1])
+    end_seq_t = connector_rep[n - 1].concat(variable_rep_true[n - 1]).concat(connector_rep[n])
+    end_seq_f = connector_rep[n - 1].concat(variable_rep_false[n - 1]).concat(connector_rep[n])
+    output = [start_seq_t, start_seq_f, end_seq_t, end_seq_f]
+    # add complements of the above to output
+    [output.append(~output[i]) for i in range(3)]
+    return output
+
 # actual selection and clearing should be done in SAT_experiment
 
