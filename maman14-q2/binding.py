@@ -60,10 +60,10 @@ def is_bound_at(strand_id:int, bind_start:int, bind_length:int) -> bool:
     # get end values (inclusive) of relevant entries
     end_in_A, end_in_B = start_in_A + _length[select_in_A] - 1, start_in_B + _length[select_in_B] - 1
     # check if start <= bind_start <= end or start <= bind_end <= end in any index of A or B
-    return  ((start_in_A <= bind_start & bind_start <= end_in_A).any() or
-             (start_in_A <= bind_end   & bind_end <= end_in_A).any()   or
-             (start_in_B <= bind_start & bind_start <= end_in_B).any() or
-             (start_in_B <= bind_end   & bind_end <= end_in_B).any())
+    return  (((start_in_A <= bind_start) & (bind_start <= end_in_A)).any() or
+             ((start_in_A <= bind_end)   & (bind_end <= end_in_A)).any()   or
+             ((start_in_B <= bind_start) & (bind_start <= end_in_B)).any() or
+             ((start_in_B <= bind_end)   & (bind_end <= end_in_B)).any())
 
 def calc_strength(id_a:int|NDArray, start_a:int|NDArray,
                   id_b:int|NDArray, start_b:int|NDArray, length:int|NDArray) -> float|NDArray[np.float32]:
@@ -188,7 +188,7 @@ def _validate_bind(id_a:int, start_a:int, id_b:int, start_b:int, length:int) -> 
     if is_bound_at(id_a, start_a, length) or is_bound_at(id_b, start_b, length):
         return False
     # check if A and B are already bound to one another at any point
-    if ((_A_id == id_a & _B_id == id_b) | (_A_id == id_b & _B_id == id_a)).any():
+    if (((_A_id == id_a) & (_B_id == id_b)) | ((_A_id == id_b) & (_B_id == id_a))).any():
         return False
     return True
 
