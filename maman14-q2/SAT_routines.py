@@ -4,8 +4,15 @@ from SATinit import variable_rep_false, variable_rep_true, connector_rep, comple
 from TwoBitArray import TwoBitArray
 from typing import List, Tuple
 from tqdm import tqdm, trange
+import numpy as np
+from numpy.typing import NDArray
 
+# constants
+ELECTROPHORESIS_FAILURE_PROB = 1e-6 # probability of strand to be wrongly selected or not selected by length
 
+# functions
+
+# ========== reindex ==========
 def check_and_reindex(threshold:float) -> None:
     """Check if there's a need to compactify the data, if so, reindex."""
     reindex_binding= binding.get_dead_fraction() > threshold
@@ -16,6 +23,7 @@ def check_and_reindex(threshold:float) -> None:
     if reindex_binding or reindex_strand:   # if bindings are above threshold OR strands were reindexed
         binding.reindex(new_ids)            # Will also update IDs if strand was reindexed
 
+# ========== step ==========
 def step(temperature: int, perform_annealing:bool = False, report:bool = False, tqdm_pos:int = 1) -> None|Tuple[int, int]:
     """
     Perform a single "step" in the simulation that is analogous to letting the sample "do its thing" uninterrupted.
@@ -65,3 +73,38 @@ def step_until_settle(temperature: int, diff: int, stop_iter: int, with_annealin
                           refresh=False)
             p.update()
             strand_num, bind_num = new_nums
+
+# ========== gel electrophoresis ==========
+def get_ids_bound_to_length(length:int) -> NDArray[np.uint32]:
+    """Get IDs of strands that are of the specified length, bound to a strand of the specified length
+    or indirectly bound to such a strand.
+    PROCESS HAS A SMALL CHANCE OF FAILURE FOR EACH STRAND"""
+    # choose strands of right length
+    length_mask = strand.get_length_mask(length)
+    # small chance of wrongly selecting or not selecting each strand
+    failure = np.random.default_rng().random(len(length_mask)) <= ELECTROPHORESIS_FAILURE_PROB  # failed selection
+    length_mask[failure] = ~length_mask[failure]  # flip selection/rejection by failure
+
+    # find all IDs bound (directly or indirectly) to previously selected strands
+    selected = np.nonzero(length_mask)[0].astype(np.uint32)
+    found = selected.copy()
+    while True:
+        found = binding.get_bound_ids(found)  # get ids of strands bound to those we found last time
+        if found.size == 0 | np.isin(selected, found).all():  # if no new IDs found
+            return selected  # no more strands to find, return output
+        # add newly found IDs to output
+        selected = np.union1d(selected, found)
+
+def electrophoresis(length: int) -> None:
+    """Remove from sample all strands that are not of the specified length or are bound (directly or indirectly)
+    To a strand of the specified length."""
+    # Select strands to discard
+    idx = np.arange(strand.get_length, dtype=np.uint32)
+    keep_mask = np.in1d(idx, get_ids_bound_to_length(length), assume_unique=True)
+    discard_mask = ~keep_mask
+    discard_ids = np.nonzero(discard_mask)[0].astype(np.uint32)
+    # delete binds with strands to discard
+    binding.delete_all_with_strand_id(discard_ids)
+    # delete all strands to discard
+    strand.bulk_delete(discard_ids)
+
