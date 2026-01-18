@@ -1,7 +1,7 @@
 """This module describes the run of an experiment for a given 3SAT formula"""
 
 from __future__ import annotations
-import binding, strand, anneal, unravel, magnetic, SATinit
+import binding, strand, anneal, unravel, magnetic, SATinit, SAT_routines
 from SATinit import variable_rep_false, variable_rep_true, connector_rep, complement_rep
 from TwoBitArray import TwoBitArray
 from typing import List, Tuple
@@ -13,7 +13,10 @@ type Clause = Tuple[Literal, Literal, Literal]  # (Clause[0] OR Clause[1] OR Cla
 type Formula = List[Clause]
 
 # constants
+DEAD_THRESHOLD = 0.5    # If dead strands/bindings fraction is above this threshold, reindex
 ANNEALING_REPS = 20
+SETTLE_DIFF = 5         # if difference (in number of strand or binds) is below this between steps, it's settled
+SETTLE_ITER = 3         # If sample is settled (as defined above) for this many iterations, stop the step_until_settled run
 
 # global variables
 temperature = 55
@@ -36,11 +39,9 @@ def generate_constraints(clause: Clause) -> Tuple[TwoBitArray, TwoBitArray, TwoB
 
 # TODO: implement magnetic selection routine
 # TODO: Implement magnetic strand removal routine, which heats the sample to unbind all and then removes magnetic strands
-# TODO: Implement "cool" routine which binds, anneals and unbinds depending on temperature
-# TODO: Implement "heat" routine which unbinds depending on temperature
-# TODO: (probably?) Implement annealing routine which works until no significant change is made
-# TODO: (maybe?) Implement bind routine which works until no significant change is made
-# TODO: (maybe?) Implement unbind routine which works until no significant change is made
+
+# TODO: use "step" in such a way that annealing depends on temperature
+
 # TODO: Implement primer seeding
 # TODO: Implement PCR routine, that is, throw in primers and let them bind
 # TODO: implement "initial selection" routine which filters by strand size, start with a_0 x_0 and end with x_{n-1} a_n
