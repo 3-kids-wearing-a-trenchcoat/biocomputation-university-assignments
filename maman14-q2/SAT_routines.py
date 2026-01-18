@@ -99,7 +99,7 @@ def get_ids_bound_to_length(length:int) -> NDArray[np.uint32]:
     found = selected.copy()
     while True:
         found = binding.get_bound_ids(found)  # get ids of strands bound to those we found last time
-        if found.size == 0 | np.isin(selected, found).all():  # if no new IDs found
+        if found.size == 0 or np.isin(selected, found).all():  # if no new IDs found
             return selected  # no more strands to find, return output
         # add newly found IDs to output
         selected = np.union1d(selected, found)
