@@ -1,14 +1,10 @@
 from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
-from threading import RLock
-from numba import njit
-from concurrent.futures import ProcessPoolExecutor
-from typing import List, Tuple, Iterable
+from typing import List, Tuple
 import strand
-from LazyLock import LazyLock
-from binding import (_A_id, _B_id, _A_start, _B_start, _length, _active, _strength, add_bind, calc_strength,
-                     _lock, rng, get_bound_strands, _bulk_add)
+from binding import (_A_id, _B_id, _A_start, _B_start, _length, _active, _strength, add_bind,
+                     rng, get_bound_strands, _bulk_add)
 
 
 ANNEALING_FAILURE_PROB = 1e-5   # probability that two strands wouldn't anneal despite being neighbors
@@ -56,9 +52,6 @@ def _replace_binds_of_annealing_host(id_a:int, id_b:int, id_host:int, id_new:int
     # global _active
     host_in_A_mask = ((_B_id == id_a) | (_B_id == id_b)) & _active & (_A_id == id_host)
     host_in_B_mask = ((_A_id == id_a) | (_A_id == id_b)) & _active & (_B_id == id_host)
-    # sanity check -- should be a total of two entries, one for id_a and one for id_b
-    assert np.count_nonzero(host_in_A_mask) + np.count_nonzero(host_in_B_mask) == 2
-    # end of sanity check
 
     # find IDs of old binds
     old_binds = np.nonzero(host_in_A_mask | host_in_B_mask)[0].tolist()
@@ -114,15 +107,10 @@ def _merge_strands(id_a:int, id_b:int, host_id:int) -> None:
     """
     if rng.random() < ANNEALING_FAILURE_PROB:
         return  # annealing has a small chance (equal to ANNEALING_FAILURE_PROB) of not happening
-    # TODO: If this were part of a parallelized process, this should use locks of some kind.
-
     new_id = strand.merge_strands(id_a, id_b)       # create merged strand and delete the two input strands
     # initialize arrays that will be used by several portions of this function
     strand_lens = strand.get_length()
     a_len, b_len = strand_lens[id_a], strand_lens[id_b]
-
-    # TODO: Add strength calculation for everything after host
-
     # create binding to replace host binds
     old_host_binds: List[int] = _replace_binds_of_annealing_host(id_a, id_b, host_id, new_id)
 
@@ -194,9 +182,6 @@ def _merge_strands(id_a:int, id_b:int, host_id:int) -> None:
     _bulk_add(new_id_arr, start_new, id_other, start_other, length, strength)
     _active[b_in_B] = False
 
-    # TODO: I can't even imagine how to begin debugging this, this is a candidate for fuck ups
-
-
 def bulk_anneal() -> None:
     """Anneal all neighboring strands that are bound to the same third strand with a small probability of failure."""
     # get ids, start position (relative to host) and bind lengths each strand bound to host
@@ -218,5 +203,4 @@ def bulk_anneal() -> None:
     # This is to avoid having to concatenate anneals. that is, new strands produced in this run of bulk_anneal
     # will not merge with any other strand during this run.
     candidates, host = _keep_only_unique(candidates, hosts)
-    # TODO: the following section could probably be parallelized
     [_merge_strands(pair[0], pair[1], host) for pair, host in zip(candidates, host)]

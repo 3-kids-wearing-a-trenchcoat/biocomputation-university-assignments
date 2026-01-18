@@ -24,9 +24,6 @@ variable_rep_true: List[TwoBitArray] = []       # cell `i` holds the representat
 variable_rep_false: List[TwoBitArray] = []      # cell `i` holds the representation of assigning x_i the value 'False'
 connector_rep: List[TwoBitArray] = []           # cell `i` holds the representation of the connector c_i
 complement_rep: List[TwoBitArray] = []          # cell `i` holds complement strand exposing sticky ends
-# constraint representations
-# constraint_rep: List[Tuple[TwoBitArray]] = []    # cell `i` represents a boolean clause made up of 3 constraints
-# each constraint is a concatenation of a literal (true of false variable) and a connector (representing position)
 
 # functions
 # ===== generate representations for literals and connectors =====
@@ -151,16 +148,6 @@ def validate_formula(formula:Formula) -> int:
 
 # ===== initialize 3SAT =====
 def populate_strands(n:int):
-    # with tqdm(total=n + 1, position=1, dynamic_ncols=True, leave=True,
-    #           desc="populating component strands") as p:
-    #     for i in range(n):
-    #         t_lit = connector_rep[i].concat(variable_rep_true[i])
-    #         f_lit = connector_rep[i].concat(variable_rep_false[i])
-    #         [strand.new_strand(t_lit) for _ in range(copies_per_literal)]
-    #         [strand.new_strand(f_lit) for _ in range(copies_per_literal)]
-    #         p.update(2)
-    #     [strand.new_strand(connector_rep[n]) for _ in range(copies_per_literal)]
-    #     p.update(1)
     for i in trange(n, position=2, dynamic_ncols=True, leave=True, desc="populating component strands"):
         t_lit = connector_rep[i].concat(variable_rep_true[i])
         f_lit = connector_rep[i].concat(variable_rep_false[i])

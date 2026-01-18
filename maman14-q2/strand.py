@@ -213,34 +213,6 @@ def get_length_mask(length:int) -> NDArray[np.bool]:
     is_active = np.fromiter(_active, dtype=np.bool)
     return is_active & (_length == length)
 
-# def filter_by_mask(mask:NDArray[np.bool]) -> None:
-#     """
-#     (soft) Delete all strands in the data according to the input mask.
-#     If cell `i` in the input mask is 'False', strand `i` will be deleted.
-#     :param mask: boolean numpy array
-#     """
-#     global _active, _offset, _length
-#     _lock.acquire()
-#     np_active = np.fromiter(_active, dtype=np.bool)
-#     change_mask = (not mask) & np_active    # active strands to make inactive
-#     # make sequences inactive in the sequences module
-#     for offset, length in zip(_offset[change_mask], _length[change_mask]):
-#         sequences.make_inactive(offset, length)
-#     # make strands inactive in this module
-#     _active &= bitarray(mask.tolist())
-#     _lock.release()
-#
-# def get_pattern_mask(pattern:TwoBitArray) -> NDArray[np.bool]:
-#     """
-#     Get a mask for all strands which contain the input pattern
-#     :param pattern: TwoBitArray object representing a sequence in a strand
-#     :return: boolean numpy array where cell `i` is 'True' iff strand `i` contains the input pattern
-#     """
-#     output = [(pattern in sequences.get(offset, length))
-#               if active else False
-#               for offset, length, active in zip(_offset, _length, _active)]
-#     return np.asarray(output, dtype=np.bool)
-
 def get_living_ids() -> NDArray[np.uint32]:
     """Get a numpy array of living strands' id values"""
     # equivalent to np.nonzero for a numpy boolean array

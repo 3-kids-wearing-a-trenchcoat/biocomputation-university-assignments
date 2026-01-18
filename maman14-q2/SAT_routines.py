@@ -1,6 +1,6 @@
 from __future__ import annotations
-import binding, strand, anneal, unravel, magnetic, SATinit, sequences, PCR
-from SATinit import variable_rep_false, variable_rep_true, connector_rep, complement_rep
+import binding, strand, anneal, unravel, sequences
+from SATinit import variable_rep_false, variable_rep_true, connector_rep
 from TwoBitArray import TwoBitArray
 from typing import List, Tuple
 from tqdm import tqdm, trange
@@ -172,6 +172,3 @@ def generate_init_selection_magnetic_strands(n:int) -> List[TwoBitArray]:
     # add complements of the above to output
     [output.append(~output[i]) for i in range(3)]
     return output
-
-# actual selection and clearing should be done in SAT_experiment
-

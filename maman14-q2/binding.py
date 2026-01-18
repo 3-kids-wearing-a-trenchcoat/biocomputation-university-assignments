@@ -18,11 +18,8 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from threading import RLock
-from numba import njit
-from concurrent.futures import ProcessPoolExecutor
-from typing import List, Tuple, Iterable
+from typing import List, Tuple
 import strand
-from LazyLock import LazyLock
 
 # constants
 # MIN_OVERLAP:int = 3
@@ -71,7 +68,6 @@ def calc_strength(id_a:int|NDArray, start_a:int|NDArray,
         seq_a, seq_b = strand.get_seq(id_a), strand.get_seq(id_b)
         bind_seq_a, bind_seq_b = seq_a[start_a: start_a + length], seq_b[start_b: start_b + length]
         comp = (bind_seq_a ^ bind_seq_b).count()
-        # return (comp * 2) / (len(seq_a) + len(seq_b))
         return comp / length
 
     # if array of binds (assumed to be of the same length and aligned by id)
@@ -215,21 +211,15 @@ def bulk_bind(repetitions:int=10) -> None:
         choices = candidates[idx].astype(candidates.dtype)
 
         # For each candidate-choice pair, pick a binding at random weighted by strength
-        # with ProcessPoolExecutor(max_workers=THREADS) as ex:
-        #     binds: List[Tuple[int, int, int, float]] = list(ex.map(_choose_binding, candidates, choices))
         binds: List[Tuple[int, int, int, float]] = list(map(_choose_binding, candidates, choices))
         # For each pair and their chosen binding, check if the binding area in either strand is not already bound
         # If it is, that binding is discarded
-        # strand_locks = LazyLock()                                   # per-strand locks
-        # f = partial(_validate_bind, strand_locks=strand_locks)      # map strand_locks to _validate_bind
         start_a, start_b, bind_length, strength = binds[0], binds[1], binds[2], binds[3]
-        # with ProcessPoolExecutor(max_workers=THREADS) as ex:
-        #     bind_is_valid =list(ex.map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
         if _active.size > 0:
             bind_is_valid = list(map(_validate_bind, candidates, start_a, choices, start_b, bind_length))
             # add all found bindings that are possible
             [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
-             for i in range(len(start_a)) if bind_is_valid[i]] # TODO: BAD AND SLOW
+             for i in range(len(start_a)) if bind_is_valid[i]]
 
 # @njit
 def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[np.uint32], NDArray[np.uint16],
@@ -243,7 +233,6 @@ def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[n
              2. array of binding start position relative to host (np.uint16)
              3. array of binding lengths (np.uint16)
     """
-    # TODO: It may be smart to instead have some kind of hash map instead of recreate this at every annealing
     host_id_in_A = (_A_id == host_id) & _active
     host_id_in_B = (_B_id == host_id) & _active
 
@@ -266,7 +255,6 @@ def get_bound_ids(host_id:int|NDArray[np.uint32]) -> NDArray[np.uint32]:
     host_id_in_B_mask = np.isin(_B_id, host_id) & _active
     bound_ids_a = _B_id[host_id_in_A_mask]
     bound_ids_b = _A_id[host_id_in_B_mask]
-    # return np.unique(np.concatenate((bound_ids_a, bound_ids_b)))
     return np.union1d(bound_ids_a, bound_ids_b)
 
 def is_bound(strand_id: int|NDArray[np.uint32]) -> bool|NDArray[np.bool]:
@@ -292,7 +280,6 @@ def delete_all_with_strand_id(strand_id: int|NDArray[np.uint32]) -> None:
     :param strand_id: int representing a single strand ID or an NDArray of strand IDs
     """
     _lock.acquire()
-    # _active[strand_id] = False
     to_delete = get_binds_that_contain(strand_id)
     _active[to_delete] = False
     _lock.release()

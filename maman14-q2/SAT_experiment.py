@@ -1,10 +1,8 @@
 """This module describes the run of an experiment for a given 3SAT formula"""
 
 from __future__ import annotations
-import binding, strand, anneal, unravel, magnetic, SATinit, SAT_routines
-from SATinit import variable_rep_false, variable_rep_true, connector_rep, complement_rep
+import strand, magnetic, SATinit, SAT_routines
 from PCR import PCR
-from TwoBitArray import TwoBitArray
 from typing import List, Tuple
 from tqdm import tqdm, trange
 from math import ceil

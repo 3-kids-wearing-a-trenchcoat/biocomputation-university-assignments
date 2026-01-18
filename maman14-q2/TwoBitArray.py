@@ -6,7 +6,6 @@ class TwoBitArray:
     Supports a syntax which matches each of the 4 possible values to some custom value"""
 
     DEFAULT_SYNTAX = [0,1,2,3]
-    # ENDIAN = 'little'
 
     def __init__(self, syntax=DEFAULT_SYNTAX):
         """
@@ -102,8 +101,6 @@ class TwoBitArray:
         """Return the index at that key in its syntax form"""
         val = self.left[key], self.right[key]
         return self.to_syntax[val]
-
-    # TODO: to_list, maybe?
 
     def xor_mask(self, other: TwoBitArray) -> bitarray:
         """
