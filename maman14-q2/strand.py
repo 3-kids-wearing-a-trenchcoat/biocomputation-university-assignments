@@ -261,3 +261,6 @@ def get_magnetic_mask() -> NDArray[np.bool]:
 
 def get_entry_num() -> int:
     return len(_active)
+
+def get_active_num() -> int:
+    return _active.count()

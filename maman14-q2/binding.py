@@ -297,6 +297,9 @@ def delete_all_with_strand_id(strand_id: int|NDArray[np.uint32]) -> None:
 def get_entry_num() -> int:
     return len(_active)
 
+def get_active_num() -> int:
+    return np.count_nonzero(_active)[0]
+
 
 # ========== RESTRICTION ENZYME FUNCTIONS ==========
 # TODO: Implement restriction enzymes
