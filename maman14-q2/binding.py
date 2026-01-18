@@ -71,7 +71,8 @@ def calc_strength(id_a:int|NDArray, start_a:int|NDArray,
         seq_a, seq_b = strand.get_seq(id_a), strand.get_seq(id_b)
         bind_seq_a, bind_seq_b = seq_a[start_a: start_a + length], seq_b[start_b: start_b + length]
         comp = (bind_seq_a ^ bind_seq_b).count()
-        return (comp * 2) / (len(seq_a) + len(seq_b))
+        # return (comp * 2) / (len(seq_a) + len(seq_b))
+        return comp / length
 
     # if array of binds (assumed to be of the same length and aligned by id)
     length_arr = strand.get_length()
@@ -167,7 +168,7 @@ def _choose_binding(id_a:int, id_b:int) -> Tuple[int, int, int, float]|None:
              1. Bind start position for strand A (int)
              2. Bind start position for strand B (int)
              3. Bind length (int)
-             4. Bind strength - fraction of total nucleotides in both strands bound to a complementary nucleotide (float)
+             4. Bind strength - fraction of nucleotides in bound span that are complementary
     """
     # generate candidate bindings
     candidates:List[Tuple[int, int, int, float]] = strand.get_possible_binds(id_a, id_b, SEED_LEN)
