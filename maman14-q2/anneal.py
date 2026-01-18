@@ -15,7 +15,7 @@ ANNEALING_FAILURE_PROB = 1e-5   # probability that two strands wouldn't anneal d
 
 # ==========ANNEALING FUNCTIONS==========
 
-@njit
+# @njit
 def _keep_only_unique(pairs: NDArray, hosts: NDArray|None = None) -> NDArray|Tuple[NDArray, NDArray]:
     """
     Given a numpy array of shape (N,2) (effectively an array of tuples of size 2), remove from the array

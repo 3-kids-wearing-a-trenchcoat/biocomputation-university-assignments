@@ -229,7 +229,7 @@ def bulk_bind(repetitions:int=10) -> None:
         [add_bind(candidates[i], start_a[i], choices[i], start_b[i], bind_length[i], strength[i])
          for i in range(len(start_a)) if bind_is_valid[i]] # TODO: BAD AND SLOW
 
-@njit
+# @njit
 def get_bound_strands(host_id:int, sort_by_start:bool = True) -> Tuple[NDArray[np.uint32], NDArray[np.uint16],
                                                                                                 NDArray[np.uint16]]:
     """
@@ -304,10 +304,3 @@ def get_active_num() -> int:
 def get_all_bound_strands() -> NDArray[np.uint32]:
     """Get IDs of all strands that are bound (in order)"""
     return np.union1d(_A_id[_active], _B_id[_active])
-
-
-# ========== RESTRICTION ENZYME FUNCTIONS ==========
-# TODO: Implement restriction enzymes
-
-# TODO: Multithreading takes more work than I expected, this is a LOWER PRIORITY to the rest of the project
-# TODO: added @njit wherever possible (the functions here are mostly numpy stuff, this could work)
