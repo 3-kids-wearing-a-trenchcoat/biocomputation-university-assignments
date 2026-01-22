@@ -59,6 +59,20 @@ def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
     seg_permutations = sum([comb(segment_num, rank) for rank in Droplet.POSSIBLE_RANKS])
     return seg_permutations, ceil(log2(seg_permutations))
 
+def uint_to_binary(x: int, width: int = 5) -> NDArray[np.bool]:
+    """
+    Convert the given unsigned integer into a boolean NDArray representing its binary value
+    :param x: uint to convert
+    :param width: desired minimum width of binary representation
+    :return: NDArray[np.bool]
+    """
+    if x < 0 or type(x) != int:
+        raise ValueError("value must be a non-negative integer")
+    bits = bin(x)[2:].zfill(width)
+    return convert_str_to_bool_ndarray(bits)
+
+def binary_to_uint(bits: NDArray[np.bool]) -> int:
+    return int("".join("1" if b else "0" for b in bits), 2)
 
 # ===== TEST =====
 # if __name__ == "__main__":
