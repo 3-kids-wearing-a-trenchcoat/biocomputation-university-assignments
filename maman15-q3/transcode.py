@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 # representations
 five_bit: TypeAlias = tuple[int, int, int, int, int]
-word_bit_pairs: List[Tuple[str, five_bit]] = [("UU", (0,0,0,0,0)), ("UV", (0,0,0,0,1)), ("UW", (0,0,0,1,0)),
+WORD_BIT_PAIRS: List[Tuple[str, five_bit]] = [("UU", (0,0,0,0,0)), ("UV", (0,0,0,0,1)), ("UW", (0,0,0,1,0)),
                                               ("UX", (0,0,0,1,1)), ("UY", (0,0,1,0,0)), ("UZ", (0,0,1,0,1)),
                                               ("VU", (0,0,1,1,0)), ("VV", (0,0,1,1,1)), ("VW", (0,1,0,0,0)),
                                               ("VX", (0,1,0,0,1)), ("VY", (0,1,0,1,0)), ("VZ", (0,1,0,1,1)),
@@ -22,4 +22,8 @@ word_bit_pairs: List[Tuple[str, five_bit]] = [("UU", (0,0,0,0,0)), ("UV", (0,0,0
                                               ("YX", (1,1,0,1,1)), ("YY", (1,1,1,0,0)), ("YZ", (1,1,1,0,1)),
                                               ("ZU", (1,1,1,1,0)), ("ZV", (1,1,1,1,1))]
 
+# TODO: Define word_base_pairs ("base" as in nucleotides)
+
 # dictionaries - matching between representations
+WORD_TO_BITS = {entry[0]: entry[1] for entry in WORD_BIT_PAIRS}
+BITS_TO_WORD = {entry[1]: entry[0] for entry in WORD_BIT_PAIRS}
