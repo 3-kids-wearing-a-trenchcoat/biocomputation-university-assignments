@@ -3,6 +3,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import List, Tuple
 import parse_sequence
+from math import ceil
 
 # constants
 POSSIBLE_RANKS = [2, 13]  # a droplet randomly chooses one of these two rank values with equal probability
@@ -12,6 +13,7 @@ MAX_SEED_VAL = 999999
 BARCODE_BASES = 10        # number of bases that make up each barcode, a base is effectively equivalent to 2-bits
 BARCODE_BITS = BARCODE_BASES * 2
 BARCODE_UPPER_BOUND = 2 ** BARCODE_BITS    # Max decimal value of a barcode
+BULK_GENERATION_OVERHEAD = 0.05
 
 class DropletGenerator:
     def __init__(self, input_seq: str, bits_per_word: int = 5):
@@ -74,5 +76,16 @@ class DropletGenerator:
         payload = np.bitwise_xor.reduce(self.segments[i] for i in segments_idx)
         # return droplet sequence as a concatenation (in order) of barcode_bin, seed_bin and payload
         return np.concatenate((barcode_bin, seed_bin, payload), dtype=np.bool)
+
+    def bulk_gen_droplets(self, n: int|None = None) -> List[NDArray[np.bool]]:
+        """
+        Generate several droplets at once using gen_droplet.
+        :param n: Number of droplets to generate.
+                  If 'None'; generates ceil[1.05 * num_of_segments] droplets
+        :return: List of boolean numpy arrays representing sequences
+        """
+        if n is None:
+            n = ceil((1 + BULK_GENERATION_OVERHEAD) * len(self.segments))
+        return [self.gen_droplet() for _ in range(n)]
 
 
