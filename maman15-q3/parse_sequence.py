@@ -39,6 +39,13 @@ def split_into_unique_segments(seq: str, div_by: int = 0) -> List[str]:
         # print("failed for length " + str(l) + ". size of set is " + str(len(set(segments))) + " whereas num of segments is " + str(len(segments)) +".")
     return [seq]    # no satisfactory segmentation found, return list containing the input
 
+def convert_str_to_bool_ndarray(s: str) -> NDArray[np.bool]:
+    bool_list = [bool(int(c)) for c in s]
+    return np.fromiter(bool_list, dtype=np.bool)
+
+def convert_segments_to_bool_ndarrays(segments: List[str]) -> List[NDArray[np.bool]]:
+    return [convert_str_to_bool_ndarray(s) for s in segments]
+
 
 # ===== TEST =====
 # if __name__ == "__main__":
