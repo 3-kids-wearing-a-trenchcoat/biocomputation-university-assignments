@@ -27,3 +27,15 @@ WORD_BIT_PAIRS: List[Tuple[str, five_bit]] = [("UU", (0,0,0,0,0)), ("UV", (0,0,0
 # dictionaries - matching between representations
 WORD_TO_BITS = {entry[0]: entry[1] for entry in WORD_BIT_PAIRS}
 BITS_TO_WORD = {entry[1]: entry[0] for entry in WORD_BIT_PAIRS}
+
+
+# functions
+def from_np_to_words(seq: NDArray[np.bool]) -> str:
+    # TODO
+
+def from_words_to_np(seq: str) -> NDArray[np.bool]:
+    # TODO
+
+# TODO: from_words_to_DNA
+
+# TODO: from_DNA_to_words

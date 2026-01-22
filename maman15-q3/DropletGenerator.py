@@ -102,4 +102,5 @@ class DropletGenerator:
             n = ceil((1 + BULK_GENERATION_OVERHEAD) * len(self.segments))
         return [self.gen_droplet() for _ in range(n)]
 
+    # TODO: bulk_gen with DNA as output -- including
 
