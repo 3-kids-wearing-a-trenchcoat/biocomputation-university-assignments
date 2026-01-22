@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import List, Tuple
 import numpy as np
 from numpy.typing import NDArray
+from math import comb, log2, ceil
+from Droplet import Droplet
 
 def append_to_size(seq: str) -> str:
     """Words in the language are represented by 5-bits, therefor we need the overall sequence length to be a
@@ -45,6 +47,17 @@ def convert_str_to_bool_ndarray(s: str) -> NDArray[np.bool]:
 
 def convert_segments_to_bool_ndarrays(segments: List[str]) -> List[NDArray[np.bool]]:
     return [convert_str_to_bool_ndarray(s) for s in segments]
+
+def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
+    """
+    Calculate the number of possible seeds a droplet can choose as a function of the number of segments
+    :param segment_num: number of segments the input sequence was divided to
+    :return: Tuple containing these two ints in order:
+             1. Number of possible seeds that a droplet should choose
+             2. Number of bits needed to represent these values
+    """
+    seg_permutations = sum([comb(segment_num, rank) for rank in Droplet.POSSIBLE_RANKS])
+    return seg_permutations, ceil(log2(seg_permutations))
 
 
 # ===== TEST =====
