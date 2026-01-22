@@ -4,17 +4,18 @@ import numpy as np
 from numpy.typing import NDArray
 from math import comb, log2, ceil
 from DropletGenerator import POSSIBLE_RANKS
+from transcode import WORD_TO_BITS, BITS_TO_WORD
 
-def append_to_size(seq: str) -> str:
-    """Words in the language are represented by 5-bits, therefor we need the overall sequence length to be a
-    multiple of 5. To do that we will append 0s to the seq to complete it to a multiple of 5, if that is necessary.
-    The true length of the sequence should be stored somehow to make sure we can tell apart junk appended data
-    and real data"""
-    rem = len(seq) % 5
-    if rem == 0:    # if it is divisible by 5, no appending is needed
-        return seq
-    output = seq + ("0" * rem)
-    return output
+# def append_to_size(seq: str) -> str:
+#     """Words in the language are represented by 5-bits, therefor we need the overall sequence length to be a
+#     multiple of 5. To do that we will append 0s to the seq to complete it to a multiple of 5, if that is necessary.
+#     The true length of the sequence should be stored somehow to make sure we can tell apart junk appended data
+#     and real data"""
+#     rem = len(seq) % 5
+#     if rem == 0:    # if it is divisible by 5, no appending is needed
+#         return seq
+#     output = seq + ("0" * rem)
+#     return output
 
 def split_into_unique_segments(seq: str, div_by: int = 0) -> List[str]:
     """
