@@ -3,7 +3,7 @@ from typing import List, Tuple
 import numpy as np
 from numpy.typing import NDArray
 from math import comb, log2, ceil
-from Droplet import Droplet
+from DropletGenerator import POSSIBLE_RANKS
 
 def append_to_size(seq: str) -> str:
     """Words in the language are represented by 5-bits, therefor we need the overall sequence length to be a
@@ -56,7 +56,7 @@ def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
              1. Number of possible seeds that a droplet should choose
              2. Number of bits needed to represent these values
     """
-    seg_permutations = sum([comb(segment_num, rank) for rank in Droplet.POSSIBLE_RANKS])
+    seg_permutations = sum([comb(segment_num, rank) for rank in POSSIBLE_RANKS])
     return seg_permutations, ceil(log2(seg_permutations))
 
 def uint_to_binary(x: int, width: int = 5) -> NDArray[np.bool]:
