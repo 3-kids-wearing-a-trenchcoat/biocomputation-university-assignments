@@ -5,6 +5,7 @@ from typing import List, Tuple
 import parse_sequence
 import transcode
 from math import comb, log2, ceil
+import itertools
 
 # constants
 POSSIBLE_RANKS = [2, 13]  # a droplet randomly chooses one of these two rank values with equal probability
@@ -25,7 +26,11 @@ def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
              2. Number of bits needed to represent these values
     """
     seg_permutations = sum([comb(segment_num, rank) for rank in POSSIBLE_RANKS])
-    return seg_permutations, ceil(log2(seg_permutations))
+    binary_rep_length = ceil(log2(seg_permutations))
+    # round binary_rep_length up to nearest multiple of 5, to keep resulting droplet sequences of length
+    # divisible by 5.
+    binary_rep_length += (5 - binary_rep_length) % 5
+    return seg_permutations, binary_rep_length
 
 
 class DropletGenerator:
@@ -37,6 +42,8 @@ class DropletGenerator:
         :param input_seq: string made up only of the characters '0' and '1', representing the binary input sequence
         :param bits_per_word: number of bits used to represent a word in the language
         """
+        if len(input_seq) % bits_per_word != 0:
+            raise ValueError("length of the input sequence is not divisible by bits_per_word")
         self.rng = np.random.default_rng(MASTER_SEED)
         # split input sequence (str) into unique, equal-length sequences (np.bool)
         str_segments = parse_sequence.split_into_unique_segments(input_seq, bits_per_word)
@@ -44,18 +51,10 @@ class DropletGenerator:
         self.seg_idx = np.arange(len(self.segments)).astype(IDX_DTYPE)
         # Calculate number of seeds needed and choose that many seeds randomly
         self.seed_num, self.seed_binary_length = calc_number_of_seeds(len(self.segments))
-        # self.possible_seeds = self.rng.integers(MAX_SEED_VAL, size=seed_num, dtype=np.uint32)
-        # self.possible_seeds = np.arange(MAX_SEED_VAL, dtype=IDX_DTYPE)
         self.used_barcode_values = set()
-        # Calculate appended bits needed for each rank.
-        # appended_bits_num[i] is the number of junk bits appended to the end of the sequence of a droplet of rank POSSIBLE_RANKS[i]
-        # a sequence is made up of a barcode (BARCODE_BITS), a seed (self.seed_binary_length)
-        # and a payload (bits for a single payload times the rank)
-        seg_len = len(self.segments[0])
-        sequence_length = [BARCODE_BITS + self.seed_binary_length + (seg_len * rank) for rank in POSSIBLE_RANKS]
-        # TODO: I AM ASSUMING I NEED TO EXTEND IT TO BE A COMPLETE WORD, I.E A MULTIPLE OF 5.
-        # This may be wrong, it may also be in conflict with how I split the input seq, check into it if something doesn't work
-        self.appended_bits_num = [seq_len % bits_per_word for seq_len in sequence_length]
+
+        # I am working with the assumption that seed_binary_length, BARCODE_BITS
+        # and the sequence length are all divisible by bits_per_word, meaning so is the concatenated droplet sequence
 
     def check_barcode(self, barcode: int) -> bool:
         """
@@ -84,7 +83,6 @@ class DropletGenerator:
         # THE ORDER IS IMPORTANT as we'll rely on it for decoding
         rank_idx = droplet_rng.integers(0, len(POSSIBLE_RANKS))
         rank = POSSIBLE_RANKS[rank_idx]
-        # rank = droplet_rng.choice(POSSIBLE_RANKS)
         segments_idx = droplet_rng.choice(self.seg_idx, rank, replace=False)
         # Generate a unique barcode
         barcode = droplet_rng.integers(0, BARCODE_UPPER_BOUND)
@@ -100,9 +98,7 @@ class DropletGenerator:
         # droplet sequence as a concatenation (in order) of barcode_bin, seed_bin and payload
         sequence = np.concatenate((barcode_bin, seed_bin, payload), dtype=np.bool)
         # Append zeros to the end of the sequence if necessary
-        if self.appended_bits_num[rank_idx] == 0:
-            return sequence
-        return np.concatenate((sequence, np.zeros(self.appended_bits_num[rank_idx], dtype=np.bool)))
+        return sequence
 
     def bulk_gen_droplets(self, in_language: bool = False, n: int|None = None) -> List[NDArray[np.bool]] | List[str]:
         """
@@ -127,9 +123,8 @@ class DropletGenerator:
         :return:
         """
         droplets: List[str] = self.bulk_gen_droplets(True, n)
-        # return [transcode.from_words_to_DNA(entry) for entry in droplets]
         DNA_pairs = [transcode.from_words_to_DNA(entry) for entry in droplets]
-        return sum(DNA_pairs, [])   # flatten list
+        return list(itertools.chain.from_iterable(DNA_pairs))
 
 
     # TODO: decode words into binary sequence
