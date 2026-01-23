@@ -22,11 +22,20 @@ WORD_BIT_PAIRS: List[Tuple[str, five_bit]] = [("UU", (0,0,0,0,0)), ("UV", (0,0,0
                                               ("YX", (1,1,0,1,1)), ("YY", (1,1,1,0,0)), ("YZ", (1,1,1,0,1)),
                                               ("ZU", (1,1,1,1,0)), ("ZV", (1,1,1,1,1))]
 
-# TODO: Define word_base_pairs ("base" as in nucleotides)
+# Matching a letter in the language to its representation in DNA bases.
+# If the two elements in the sub-tuple are identical, that letter is represented by that letter directly.
+# Otherwise, that letter is represented by a 50-50 distribution among the two bases in the sub-tuple
+# For example, The letter "U" is represented by the base "A", and the letter "Y" is represented by a 50-50 distribution
+# of the bases "A" and "G".
+LETTER_BASE_MAP: List[Tuple[str, Tuple[str, str]]] = [("U", ("A", "A")), ("V", ("C", "C")),
+                                                      ("W", ("G", "G")), ("X", ("T", "T")),
+                                                      ("Y", ("A", "G")), ("Z", ("C", "T"))]
 
 # dictionaries - matching between representations
 WORD_TO_BITS = {entry[0]: entry[1] for entry in WORD_BIT_PAIRS}
 BITS_TO_WORD = {entry[1]: entry[0] for entry in WORD_BIT_PAIRS}
+LETTER_TO_BASE_PAIR = {entry[0]: entry[1] for entry in LETTER_BASE_MAP}
+BASE_PAIR_TO_LETTER = {entry[1]: entry[0] for entry in LETTER_BASE_MAP}
 
 
 # functions
@@ -43,6 +52,27 @@ def from_words_to_np(seq: str, letters_in_word: int = 2) -> NDArray[np.bool]:
     bin_words = [np.array(WORD_TO_BITS[seq[i: i + letters_in_word]], dtype=np.bool) for i in range(0, len(seq), 2)]
     return np.concatenate(bin_words)
 
-# TODO: from_words_to_DNA
+def from_words_to_DNA(seq: str) -> Tuple[str, str]:
+    """
+    Convert a language sequence into its DNA representation
+    :param seq: sequence in language form
+    :return: Two strings representing two DNA strands encoding the sequence.
+             Two sequences are returned as some of the letters in the language are defined by a 50-50 ratio between bases.
+    """
+    out_arr1: List[str] = []
+    out_arr2: List[str] = []
+    for letter in seq:
+        base_pair = LETTER_TO_BASE_PAIR[letter]
+        out_arr1.append(base_pair[0]), out_arr2.append(base_pair[1])
+    return "".join(out_arr1), "".join(out_arr2)
 
-# TODO: from_DNA_to_words
+def _get_letter_by_base_pair(base1: str, base2: str) -> str:
+    """Get the letter represented by this pair of parallel bases"""
+    if len(base1) != 1 or len(base2) != 1:
+        raise ValueError("Expected single character strings")
+    pair = (base1, base2) if base1 <= base2 else (base2, base1)
+    return BASE_PAIR_TO_LETTER[pair]
+
+def from_DNA_to_words(strand1: str, strand2: str) -> str:
+    out_arr: List[str] = [_get_letter_by_base_pair(base1, base2) for base1, base2 in zip(strand1, strand2)]
+    return "".join(out_arr)
