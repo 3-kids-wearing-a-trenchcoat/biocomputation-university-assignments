@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from typing import List, Tuple
 import parse_sequence
 import transcode
-from math import ceil
+from math import comb, log2, ceil
 
 # constants
 POSSIBLE_RANKS = [2, 13]  # a droplet randomly chooses one of these two rank values with equal probability
@@ -15,6 +15,18 @@ BARCODE_BASES = 10        # number of bases that make up each barcode, a base is
 BARCODE_BITS = BARCODE_BASES * 2
 BARCODE_UPPER_BOUND = 2 ** BARCODE_BITS    # Max decimal value of a barcode
 BULK_GENERATION_OVERHEAD = 0.05
+
+def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
+    """
+    Calculate the number of possible seeds a droplet can choose as a function of the number of segments
+    :param segment_num: number of segments the input sequence was divided to
+    :return: Tuple containing these two ints in order:
+             1. Number of possible seeds that a droplet should choose
+             2. Number of bits needed to represent these values
+    """
+    seg_permutations = sum([comb(segment_num, rank) for rank in POSSIBLE_RANKS])
+    return seg_permutations, ceil(log2(seg_permutations))
+
 
 class DropletGenerator:
     def __init__(self, input_seq: str, bits_per_word: int = 5):
@@ -29,9 +41,9 @@ class DropletGenerator:
         # split input sequence (str) into unique, equal-length sequences (np.bool)
         str_segments = parse_sequence.split_into_unique_segments(input_seq, bits_per_word)
         self.segments = parse_sequence.convert_segments_to_bool_ndarrays(str_segments)
-        self.seg_idx = np.arange(len(self.segments), dtype=IDX_DTYPE)
+        self.seg_idx = np.arange(len(self.segments)).astype(IDX_DTYPE)
         # Calculate number of seeds needed and choose that many seeds randomly
-        self.seed_num, self.seed_binary_length = parse_sequence.calc_number_of_seeds(len(self.segments))
+        self.seed_num, self.seed_binary_length = calc_number_of_seeds(len(self.segments))
         # self.possible_seeds = self.rng.integers(MAX_SEED_VAL, size=seed_num, dtype=np.uint32)
         # self.possible_seeds = np.arange(MAX_SEED_VAL, dtype=IDX_DTYPE)
         self.used_barcode_values = set()
@@ -66,7 +78,7 @@ class DropletGenerator:
         :return: boolean NDArray representing the binary sequence
         """
         # Choose seed for droplet
-        seed = self.rng.integers(0, self.seed_num, dtype=IDX_DTYPE)
+        seed = self.rng.integers(0, self.seed_num).astype(IDX_DTYPE)
         droplet_rng = np.random.default_rng(seed)
         # randomly choose INDEX OF rank and then choose SEGMENT INDEXES accordingly
         # THE ORDER IS IMPORTANT as we'll rely on it for decoding
@@ -82,9 +94,9 @@ class DropletGenerator:
             barcode = droplet_rng.integers(0, BARCODE_UPPER_BOUND)
         # Get binary representation for barcode and seed
         barcode_bin = parse_sequence.uint_to_binary(barcode, BARCODE_BITS)  # binary representation of barcode
-        seed_bin = parse_sequence.uint_to_binary(seed, self.seed_num)
+        seed_bin = parse_sequence.uint_to_binary(seed, self.seed_binary_length)
         # calculate payload -- the portion of the droplet's sequence that actually contains the data
-        payload = np.bitwise_xor.reduce(self.segments[i] for i in segments_idx)
+        payload = np.bitwise_xor.reduce([self.segments[i] for i in segments_idx])
         # droplet sequence as a concatenation (in order) of barcode_bin, seed_bin and payload
         sequence = np.concatenate((barcode_bin, seed_bin, payload), dtype=np.bool)
         # Append zeros to the end of the sequence if necessary

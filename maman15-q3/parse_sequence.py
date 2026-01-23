@@ -3,7 +3,6 @@ from typing import List, Tuple
 import numpy as np
 from numpy.typing import NDArray
 from math import comb, log2, ceil
-from DropletGenerator import POSSIBLE_RANKS
 from transcode import WORD_TO_BITS, BITS_TO_WORD
 
 # def append_to_size(seq: str) -> str:
@@ -49,17 +48,6 @@ def convert_str_to_bool_ndarray(s: str) -> NDArray[np.bool]:
 def convert_segments_to_bool_ndarrays(segments: List[str]) -> List[NDArray[np.bool]]:
     return [convert_str_to_bool_ndarray(s) for s in segments]
 
-def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
-    """
-    Calculate the number of possible seeds a droplet can choose as a function of the number of segments
-    :param segment_num: number of segments the input sequence was divided to
-    :return: Tuple containing these two ints in order:
-             1. Number of possible seeds that a droplet should choose
-             2. Number of bits needed to represent these values
-    """
-    seg_permutations = sum([comb(segment_num, rank) for rank in POSSIBLE_RANKS])
-    return seg_permutations, ceil(log2(seg_permutations))
-
 def uint_to_binary(x: int, width: int = 5) -> NDArray[np.bool]:
     """
     Convert the given unsigned integer into a boolean NDArray representing its binary value
@@ -67,8 +55,9 @@ def uint_to_binary(x: int, width: int = 5) -> NDArray[np.bool]:
     :param width: desired minimum width of binary representation
     :return: NDArray[np.bool]
     """
-    if x < 0 or type(x) != int:
+    if x < 0 or x != int(x):
         raise ValueError("value must be a non-negative integer")
+    x = int(x)
     bits = bin(x)[2:].zfill(width)
     return convert_str_to_bool_ndarray(bits)
 

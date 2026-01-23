@@ -1,6 +1,12 @@
 from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
+from DropletGenerator import DropletGenerator
+from typing import List, Tuple
+import random
+
+#constants
+COPIES_PER_OLIGOMER = 100
 
 
 # input -- The input sequence given in the assignment
@@ -27,8 +33,25 @@ EXAMPLE_SEQUENCE: str = ("000111111000101100001000000010000010111000010010100111
                          "000001000111011110000111100001111001100011111111000011110001")
 
 # functions
-# TODO: encode function
+def encode(generator: DropletGenerator, copies_per_oligomer: int = COPIES_PER_OLIGOMER) -> List[str]:
+    """
+    Encode data sequence as droplets, multiply them each and shuffle them.
+    :param generator: DropletGenerator
+    :param copies_per_oligomer: How many copies of each generated oligomer should be in the final output
+    :return: List of strings representing DNA sequences
+    """
+    oligomers = generator.bulk_gen_as_DNA() * copies_per_oligomer
+    random.shuffle(oligomers)
+    return oligomers
 
 # TODO: decode function
 
-# TODO: run function
+def run_experiment(seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5):
+    droplet_generator = DropletGenerator(seq, bits_per_word)
+    oligomers = encode(droplet_generator)
+    print("output:")
+    print(oligomers)
+
+
+if __name__ == "__main__":
+    run_experiment()
