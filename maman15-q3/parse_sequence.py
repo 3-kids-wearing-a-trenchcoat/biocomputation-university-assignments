@@ -1,20 +1,8 @@
 from __future__ import annotations
-from typing import List, Tuple
+from typing import List, Dict
 import numpy as np
 from numpy.typing import NDArray
-from math import comb, log2, ceil
-from transcode import WORD_TO_BITS, BITS_TO_WORD
 
-# def append_to_size(seq: str) -> str:
-#     """Words in the language are represented by 5-bits, therefor we need the overall sequence length to be a
-#     multiple of 5. To do that we will append 0s to the seq to complete it to a multiple of 5, if that is necessary.
-#     The true length of the sequence should be stored somehow to make sure we can tell apart junk appended data
-#     and real data"""
-#     rem = len(seq) % 5
-#     if rem == 0:    # if it is divisible by 5, no appending is needed
-#         return seq
-#     output = seq + ("0" * rem)
-#     return output
 
 def split_into_unique_segments(seq: str, div_by: int = 0) -> List[str]:
     """
@@ -64,11 +52,18 @@ def uint_to_binary(x: int, width: int = 5) -> NDArray[np.bool]:
 def binary_to_uint(bits: NDArray[np.bool]) -> int:
     return int("".join("1" if b else "0" for b in bits), 2)
 
-# ===== TEST =====
-# if __name__ == "__main__":
-#     from main import EXAMPLE_SEQUENCE
-#     assert len(EXAMPLE_SEQUENCE) == len(append_to_size(EXAMPLE_SEQUENCE))
-#     split = split_into_unique_segments(EXAMPLE_SEQUENCE, 5)
-#     print("length of overall sequence is " + str(len(EXAMPLE_SEQUENCE)))
-#     print("len of each sequence is " + str(len(split[0])))
-#     print("number of sequences is " + str(len(split)))
+def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 10) -> Dict[str, List[str]]:
+    """
+    Divide the input string array into buckets such that each bucket contains strings
+    with the same prefix.
+    :param strings: List of strings
+    :param prefix_len: length of prefix
+    :return: Dictionary, key is the prefix and the value is a list of all strings that have that prefix.
+    """
+    buckets: Dict[str, List[str]] = dict()
+    for s in strings:
+        if len(s) < prefix_len:
+            raise ValueError("At least one of the input strings is shorter than the prefix length")
+        key = s[:prefix_len]
+        buckets[key].append(s)
+    return buckets
