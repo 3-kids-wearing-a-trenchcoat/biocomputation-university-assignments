@@ -30,11 +30,18 @@ BITS_TO_WORD = {entry[1]: entry[0] for entry in WORD_BIT_PAIRS}
 
 
 # functions
-def from_np_to_words(seq: NDArray[np.bool]) -> str:
-    # TODO
+def from_np_to_words(seq: NDArray[np.bool], word_len: int = 5) -> str:
+    substrings: List[str] = []
+    # assuming seq's length is divisible by word_len
+    for start in range(0, seq.size, word_len):
+        # also assuming all values I might encounter here are defined in the dict
+        as_tuple = tuple(seq[start: start + word_len])
+        substrings.append(BITS_TO_WORD[as_tuple])
+    return "".join(substrings)
 
-def from_words_to_np(seq: str) -> NDArray[np.bool]:
-    # TODO
+def from_words_to_np(seq: str, letters_in_word: int = 2) -> NDArray[np.bool]:
+    bin_words = [np.array(WORD_TO_BITS[seq[i: i + letters_in_word]], dtype=np.bool) for i in range(0, len(seq), 2)]
+    return np.concatenate(bin_words)
 
 # TODO: from_words_to_DNA
 

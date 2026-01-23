@@ -3,6 +3,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import List, Tuple
 import parse_sequence
+import transcode
 from math import ceil
 
 # constants
@@ -91,16 +92,25 @@ class DropletGenerator:
             return sequence
         return np.concatenate((sequence, np.zeros(self.appended_bits_num[rank_idx], dtype=np.bool)))
 
-    def bulk_gen_droplets(self, n: int|None = None) -> List[NDArray[np.bool]]:
+    def bulk_gen_droplets(self, in_language: bool = False, n: int|None = None) -> List[NDArray[np.bool]] | List[str]:
         """
         Generate several droplets at once using gen_droplet.
         :param n: Number of droplets to generate.
                   If 'None'; generates ceil[1.05 * num_of_segments] droplets
-        :return: List of boolean numpy arrays representing sequences
+        :param in_language: Whether to return the output in the language
+        :return: List of boolean numpy arrays representing sequences if in_language is 'False'.
+                 if in_language is 'True', return a list of strings representing sequences.
         """
         if n is None:
             n = ceil((1 + BULK_GENERATION_OVERHEAD) * len(self.segments))
-        return [self.gen_droplet() for _ in range(n)]
+        output = [self.gen_droplet() for _ in range(n)]
+        if in_language:
+            return [transcode.from_np_to_words(entry) for entry in output]
+        return output
 
     # TODO: bulk_gen with DNA as output -- including
+
+    # TODO: decode words into binary sequence
+
+    # TODO: decode DNA into binary via words
 
