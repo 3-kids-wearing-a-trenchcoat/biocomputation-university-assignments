@@ -108,7 +108,17 @@ class DropletGenerator:
             return [transcode.from_np_to_words(entry) for entry in output]
         return output
 
-    # TODO: bulk_gen with DNA as output -- including
+    def bulk_gen_as_DNA(self, n: int|None = None) -> List[str]:
+        """
+        Generate several droplets at once using gen_droplet
+        :param n:
+        :return:
+        """
+        droplets: List[str] = self.bulk_gen_droplets(True, n)
+        # return [transcode.from_words_to_DNA(entry) for entry in droplets]
+        DNA_pairs = [transcode.from_words_to_DNA(entry) for entry in droplets]
+        return sum(DNA_pairs, [])   # flatten list
+
 
     # TODO: decode words into binary sequence
 
