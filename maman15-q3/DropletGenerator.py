@@ -11,7 +11,6 @@ import itertools
 POSSIBLE_RANKS = [2, 13]  # a droplet randomly chooses one of these two rank values with equal probability
 IDX_DTYPE = np.uint16
 MASTER_SEED = 43523345234
-MAX_SEED_VAL = 999999
 BARCODE_BASES = 10        # number of bases that make up each barcode, a base is effectively equivalent to 2-bits
 BARCODE_BITS = BARCODE_BASES * 2
 BARCODE_UPPER_BOUND = 2 ** BARCODE_BITS    # Max decimal value of a barcode
@@ -55,6 +54,8 @@ class DropletGenerator:
 
         # I am working with the assumption that seed_binary_length, BARCODE_BITS
         # and the sequence length are all divisible by bits_per_word, meaning so is the concatenated droplet sequence
+
+    # ===== ENCODING PHASE =====
 
     def check_barcode(self, barcode: int) -> bool:
         """
@@ -126,6 +127,7 @@ class DropletGenerator:
         DNA_pairs = [transcode.from_words_to_DNA(entry) for entry in droplets]
         return list(itertools.chain.from_iterable(DNA_pairs))
 
+    # ===== DECODING PHASE =====
 
     # TODO: decode words into binary sequence
 
