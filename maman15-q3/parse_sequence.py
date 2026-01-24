@@ -52,12 +52,14 @@ def uint_to_binary(x: int, width: int = 5) -> NDArray[np.bool]:
 def binary_to_uint(bits: NDArray[np.bool]) -> int:
     return int("".join("1" if b else "0" for b in bits), 2)
 
-def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 10) -> Dict[str, List[str]]:
+def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 20,
+                             discard_prefix: bool = False) -> Dict[str, List[str]]:
     """
     Divide the input string array into buckets such that each bucket contains strings
     with the same prefix.
     :param strings: List of strings
     :param prefix_len: length of prefix
+    :param discard_prefix: whether to discard the prefix in the value field
     :return: Dictionary, key is the prefix and the value is a list of all strings that have that prefix.
     """
     buckets: Dict[str, List[str]] = dict()
@@ -65,5 +67,5 @@ def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 10) -> Dict[s
         if len(s) < prefix_len:
             raise ValueError("At least one of the input strings is shorter than the prefix length")
         key = s[:prefix_len]
-        buckets[key].append(s)
+        buckets[key].append(s if not discard_prefix else s[prefix_len:])
     return buckets
