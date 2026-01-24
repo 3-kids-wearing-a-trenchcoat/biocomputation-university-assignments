@@ -24,6 +24,7 @@ def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
              1. Number of possible seeds that a droplet should choose
              2. Number of bits needed to represent these values
     """
+    # TODO: divisor should be specified rather than baked in as 5
     seg_permutations = sum([comb(segment_num, rank) for rank in POSSIBLE_RANKS])
     binary_rep_length = ceil(log2(seg_permutations))
     # round binary_rep_length up to nearest multiple of 5, to keep resulting droplet sequences of length
@@ -33,6 +34,7 @@ def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
 
 
 class DropletGenerator:
+    # TODO: (extended?) Hamming code error correction
     def __init__(self, input_seq: str, bits_per_word: int = 5):
         """
         Initialize the droplet generator.
@@ -41,6 +43,7 @@ class DropletGenerator:
         :param input_seq: string made up only of the characters '0' and '1', representing the binary input sequence
         :param bits_per_word: number of bits used to represent a word in the language
         """
+        # TODO: seed length can probably be smaller and explicitly defined as input
         if len(input_seq) % bits_per_word != 0:
             raise ValueError("length of the input sequence is not divisible by bits_per_word")
         self.rng = np.random.default_rng(MASTER_SEED)
@@ -126,10 +129,3 @@ class DropletGenerator:
         droplets: List[str] = self.bulk_gen_droplets(True, n)
         DNA_pairs = [transcode.from_words_to_DNA(entry) for entry in droplets]
         return list(itertools.chain.from_iterable(DNA_pairs))
-
-    # ===== DECODING PHASE =====
-
-    # TODO: decode words into binary sequence
-
-    # TODO: decode DNA into binary via words
-
