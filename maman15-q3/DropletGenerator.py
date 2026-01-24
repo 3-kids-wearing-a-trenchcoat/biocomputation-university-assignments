@@ -129,3 +129,21 @@ class DropletGenerator:
         droplets: List[str] = self.bulk_gen_droplets(True, n)
         DNA_pairs = [transcode.from_words_to_DNA(entry) for entry in droplets]
         return list(itertools.chain.from_iterable(DNA_pairs))
+
+    def find_segments(self, sequence: NDArray[np.bool]) -> NDArray[IDX_DTYPE]:
+        """
+        Find the segments the given sequence refers to via the encoded seed value.
+        :param sequence: encoded sequence WITHOUT THE BARCODE
+        :return: List of integers representing segment indexes
+        """
+        # find seed
+        seed_binary = sequence[:self.seed_binary_length]
+        seed = parse_sequence.binary_to_uint(seed_binary)
+        # find segments based on seed
+        droplet_rng = np.random.default_rng(seed)
+        # randomly choose INDEX OF rank and then choose SEGMENT INDEXES accordingly
+        # THE ORDER IS IMPORTANT as we'll rely on it for decoding
+        rank_idx = droplet_rng.integers(0, len(POSSIBLE_RANKS))
+        rank = POSSIBLE_RANKS[rank_idx]
+        segments_idx = droplet_rng.choice(self.seg_idx, rank, replace=False)
+        return segments_idx
