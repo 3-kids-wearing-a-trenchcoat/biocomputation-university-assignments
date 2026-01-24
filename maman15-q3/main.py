@@ -3,6 +3,8 @@ import numpy as np
 from numpy.typing import NDArray
 from DropletGenerator import DropletGenerator
 from typing import List, Tuple
+from decoder import sequence_droplet
+from parse_sequence import binary_to_uint
 import random
 
 #constants
@@ -51,6 +53,12 @@ def run_experiment(seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5):
     oligomers = encode(droplet_generator)
     print("output:")
     print(oligomers)
+    sequenced_oligomers = sequence_droplet(oligomers)
+    print("sequencing output (sans barcode prefix):")
+    for seq_ol in sequenced_oligomers:
+        bin_str = str(bin(binary_to_uint(seq_ol)))[2:].zfill(36)
+        # print(bin_str + " (len: " + str(len(seq_ol)) + ").")
+        print(bin_str + " (len: " + str(len(bin_str)) + ").")
 
 
 if __name__ == "__main__":

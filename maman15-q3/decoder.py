@@ -33,6 +33,9 @@ def _consensus_char(n: int, sequences: List[str]) -> Tuple[str, str]:
     """
     base_in_n = [seq[n] for seq in sequences]
     counts = Counter(base_in_n)
+    if len(counts) == 1:
+        output = list(counts.keys())[0]
+        return output, output
     candidate1, candidate2 = counts.most_common(2)  # get the two most common characters and their occurrence num
     total_occurrences = counts.total()
     base1, frac1 = candidate1[0], candidate1[1] / total_occurrences
