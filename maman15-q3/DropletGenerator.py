@@ -9,7 +9,7 @@ import itertools
 
 # constants
 POSSIBLE_RANKS = [2, 13]  # a droplet randomly chooses one of these two rank values with equal probability
-IDX_DTYPE = np.uint16
+IDX_DTYPE = np.uint64
 MASTER_SEED = 43523345234
 BARCODE_BASES = 10        # number of bases that make up each barcode, a base is effectively equivalent to 2-bits
 BARCODE_BITS = BARCODE_BASES * 2

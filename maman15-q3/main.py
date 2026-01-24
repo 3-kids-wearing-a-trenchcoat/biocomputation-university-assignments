@@ -56,7 +56,7 @@ def run_experiment(seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5):
     sequenced_oligomers = sequence_droplet(oligomers)
     print("sequencing output (sans barcode prefix):")
     for seq_ol in sequenced_oligomers:
-        bin_str = str(bin(binary_to_uint(seq_ol)))[2:].zfill(36)
+        bin_str = str(bin(binary_to_uint(seq_ol)))[2:].zfill(70)
         # print(bin_str + " (len: " + str(len(seq_ol)) + ").")
         print(bin_str + " (len: " + str(len(bin_str)) + ").")
 
