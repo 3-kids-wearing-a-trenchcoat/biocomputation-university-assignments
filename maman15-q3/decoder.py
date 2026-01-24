@@ -1,0 +1,83 @@
+from __future__ import annotations
+import numpy as np
+from numpy.typing import NDArray
+from typing import List, Tuple, Dict
+import parse_sequence
+import transcode
+from DropletGenerator import IDX_DTYPE, MASTER_SEED, BARCODE_BASES, DropletGenerator
+from collections import Counter
+
+# constants
+
+# Some letters in the language are represented by a 50-50 ratio between two bases.
+# If the two most frequent bases in a certain index of the sequences are within this margin of being 50-50,
+# we consider it to be a double-base representation.
+# That is, if the occurrence fraction of the two most frequent bases is in the range [0.5 - margin, 0.5 + margin].
+# If a base's occurrence fraction is between [1 - margin, 1], we consider this to be a single-base represented letter.
+# If neither, some terrible mass-data-corruption took place.
+BASE_REP_MARGIN = 0.1
+BASE_REP_MARGIN_MAX = 1 - BASE_REP_MARGIN
+BASE_REP_MARGIN_BELOW_HALF = 0.5 - BASE_REP_MARGIN
+BASE_REP_MARGIN_ABOVE_HALF = 0.5 + BASE_REP_MARGIN
+# clusters (by barcode) which have fewer than this many strands are discarded
+MIN_IN_CLUSTER = 10
+
+def _consensus_char(n: int, sequences: List[str]) -> Tuple[str, str]:
+    """
+    Get the consensus among the given sequences for the n-th character.
+    :param n: index of character to examine
+    :param sequences: input sequences
+    :return: a tuple of characters representing bases as defined in transcode.LETTER_BASE_MAP.
+             If a letter is represented by a single base, both elements in the output are the same.
+             Otherwise, the tuple contains the two elements whose 50-50 ratio defines the letter.
+    """
+    base_in_n = [seq[n] for seq in sequences]
+    counts = Counter(base_in_n)
+    candidate1, candidate2 = counts.most_common(2)  # get the two most common characters and their occurrence num
+    total_occurrences = counts.total()
+    base1, frac1 = candidate1[0], candidate1[1] / total_occurrences
+    # if the most common base's occurrence fraction is within the margin to 100%, return it.
+    if frac1 >= BASE_REP_MARGIN_MAX:
+        return base1, base1
+    base2, frac2 = candidate2[0], candidate2[1] / total_occurrences
+    # If the two most common bases are within margin of splitting 50-50, return both in lexicographic order
+    if (BASE_REP_MARGIN_BELOW_HALF <= frac1 <= BASE_REP_MARGIN_ABOVE_HALF and
+        BASE_REP_MARGIN_BELOW_HALF <= frac2 <= BASE_REP_MARGIN_ABOVE_HALF):
+        return (base1, base2) if (base1 < base2) else (base2, base1)
+    raise ValueError("Failed to obtain consensus among sequences for character " + str(n) + ".  "
+                     "This suggests some disastrous data corruption took place.")
+
+def _build_by_consensus(sequences) -> Tuple[str, str]:
+    """
+
+    :param sequences:
+    :return:
+    """
+    # Filter so that only sequences of the most common length are kept
+    # (This filters out corruptions caused by missing or "extra" bases
+    target_len = max([len(s) for s in sequences])
+    seqs = [seq for seq in sequences if len(seq) == target_len]
+    # Build the two output strings, character by character, using _consensus_char
+    out_list_a, out_list_b = [], []
+    for i in range(target_len):
+        a_addition, b_addition = _consensus_char(i, seqs)
+        out_list_a.append(a_addition), out_list_b.append(b_addition)
+    return "".join(out_list_a), "".join(out_list_b)
+
+def sequence_droplet(sequences: List[str]) -> List[NDArray[np.bool]]:
+    """
+    Generate the segments encoded in this droplet.
+    :param sequences: Sequences to decode
+    :return: List of boolean numpy arrays, each is the binary representation of a segment.
+             The barcode portion of each binary representation has been removed, as it is not needed
+             beyond this process.
+    """
+    # Divide sequences into clusters by their barcode prefix. (
+    clusters = parse_sequence.bucket_strings_by_prefix(sequences, BARCODE_BASES, True)
+    output: List[NDArray[np.bool]] = []
+    for bucket in clusters.values():
+        strand1, strand2 = _build_by_consensus(bucket)  # recreate the two representative DNA strands via consensus
+        in_language = transcode.from_DNA_to_words(strand1, strand2) # convert the two representative strands into the language
+        output.append(transcode.from_words_to_np(in_language))  # convert language into binary
+        # TODO: error correction???
+    return output
