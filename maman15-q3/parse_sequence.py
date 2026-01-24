@@ -73,3 +73,7 @@ def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 10,
             buckets[key] = []
         buckets[key].append(s if not discard_prefix else s[prefix_len:])
     return buckets
+
+def np_binary_to_str(arr: NDArray[np.bool]) -> str:
+    """Convert boolean numpy array to a string of 0s and 1s"""
+    return "".join(["1" if arr[i] else "0" for i in range(len(arr))])

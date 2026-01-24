@@ -1,15 +1,12 @@
 from __future__ import annotations
-import numpy as np
-from numpy.typing import NDArray
 from DropletGenerator import DropletGenerator
-from typing import List, Tuple
-from decoder import sequence_droplet
-from parse_sequence import binary_to_uint
+from typing import List
+from decoder import sequence_droplet, decode_data
+from parse_sequence import np_binary_to_str
 import random
 
 #constants
 COPIES_PER_OLIGOMER = 100
-
 
 # input -- The input sequence given in the assignment
 EXAMPLE_SEQUENCE: str = ("000111111000101100001000000010000010111000010010100111100110000100000000000000110011000000110"
@@ -46,19 +43,23 @@ def encode(generator: DropletGenerator, copies_per_oligomer: int = COPIES_PER_OL
     random.shuffle(oligomers)
     return oligomers
 
-# TODO: decode function
-
-def run_experiment(seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5):
-    droplet_generator = DropletGenerator(seq, bits_per_word)
+def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5):
+    droplet_generator = DropletGenerator(input_seq, bits_per_word)
     oligomers = encode(droplet_generator)
-    print("output:")
-    print(oligomers)
     sequenced_oligomers = sequence_droplet(oligomers)
-    print("sequencing output (sans barcode prefix):")
-    for seq_ol in sequenced_oligomers:
-        bin_str = str(bin(binary_to_uint(seq_ol)))[2:].zfill(70)
-        # print(bin_str + " (len: " + str(len(seq_ol)) + ").")
-        print(bin_str + " (len: " + str(len(bin_str)) + ").")
+    segment_idxs = [droplet_generator.find_segments(entry) for entry in sequenced_oligomers]
+    data = [seq[droplet_generator.seed_binary_length:] for seq in sequenced_oligomers]
+    decoded_seq_bin = decode_data(data, segment_idxs)
+    decoded_seq =  np_binary_to_str(decoded_seq_bin)
+
+    if decoded_seq == input_seq:
+        print("input sequence and output sequence are identical!")
+    else:
+        print("SEQUENCE MISMATCH!!")
+        print("input:")
+        print(input_seq)
+        print("output:")
+        print(decoded_seq)
 
 
 if __name__ == "__main__":
