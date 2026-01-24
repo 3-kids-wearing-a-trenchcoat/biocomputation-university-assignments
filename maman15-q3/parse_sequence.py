@@ -52,7 +52,7 @@ def uint_to_binary(x: int, width: int = 5) -> NDArray[np.bool]:
 def binary_to_uint(bits: NDArray[np.bool]) -> int:
     return int("".join("1" if b else "0" for b in bits), 2)
 
-def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 20,
+def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 10,
                              discard_prefix: bool = False) -> Dict[str, List[str]]:
     """
     Divide the input string array into buckets such that each bucket contains strings
