@@ -130,7 +130,8 @@ class DropletGenerator:
         """
         droplets: List[str] = self.bulk_gen_droplets(True, n)
         DNA_pairs = [transcode.from_words_to_DNA(entry) for entry in droplets]
-        return list(itertools.chain.from_iterable(DNA_pairs))
+        output = list(itertools.chain.from_iterable(DNA_pairs))
+        return output
 
     def find_segments(self, sequence: NDArray[np.bool]) -> NDArray[IDX_DTYPE]:
         """

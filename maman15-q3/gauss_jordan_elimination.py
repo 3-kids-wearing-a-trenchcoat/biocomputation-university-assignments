@@ -37,11 +37,11 @@ def form_into_mat(input_list: List[NDArray[np.bool]] | List[NDArray[IDX_DTYPE]])
     #     for col_idx in input_list[i]:
     #         output[i, col_idx] = True
 
-    # TODO: sanity check
-    for i in range(len(input_list)):
-        print(np.sort(input_list[i]))
-        print(np.nonzero(output[i])[0])
-        print("---------------")
+    # # TODO: sanity check
+    # for i in range(len(input_list)):
+    #     print(np.sort(input_list[i]))
+    #     print(np.nonzero(output[i])[0])
+    #     print("---------------")
 
     return output
 

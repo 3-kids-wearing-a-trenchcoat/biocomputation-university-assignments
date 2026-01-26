@@ -41,7 +41,7 @@ def encode(generator: DropletGenerator, copies_per_oligomer: int = COPIES_PER_OL
     :return: List of strings representing DNA sequences
     """
     oligomers = generator.bulk_gen_as_DNA() * copies_per_oligomer
-    random.shuffle(oligomers)
+    # random.shuffle(oligomers)
     return oligomers
 
 def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5):

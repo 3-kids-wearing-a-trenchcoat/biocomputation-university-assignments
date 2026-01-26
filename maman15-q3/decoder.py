@@ -80,6 +80,8 @@ def sequence_droplet(sequences: List[str]) -> List[NDArray[np.bool]]:
     clusters = parse_sequence.bucket_strings_by_prefix(sequences, BARCODE_BASES, True)
     output: List[NDArray[np.bool]] = []
     for bucket in clusters.values():
+        if len(bucket) < MIN_IN_CLUSTER:
+            continue    # ignore buckets below the minimum size
         strand1, strand2 = _build_by_consensus(bucket)  # recreate the two representative DNA strands via consensus
         in_language = transcode.from_DNA_to_words(strand1, strand2) # convert the two representative strands into the language
         output.append(transcode.from_words_to_np(in_language))  # convert language into binary
