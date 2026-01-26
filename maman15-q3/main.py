@@ -4,6 +4,7 @@ from typing import List
 from decoder import sequence_droplet, decode_data
 from parse_sequence import np_binary_to_str
 import random
+import transcode
 
 #constants
 COPIES_PER_OLIGOMER = 100

@@ -10,7 +10,7 @@ For the purposes of decoding DNA storage, the matrices will be:
 from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
-from typing import List
+from typing import List, Tuple
 from DropletGenerator import IDX_DTYPE
 
 def form_into_mat(input_list: List[NDArray[np.bool]] | List[NDArray[IDX_DTYPE]]) -> NDArray[np.bool]:
@@ -33,45 +33,92 @@ def form_into_mat(input_list: List[NDArray[np.bool]] | List[NDArray[IDX_DTYPE]])
     output = np.zeros((len(input_list), vec_len), dtype=np.bool)
     for i in range(len(input_list)):
         output[i][input_list[i]] = True
-        # indexes = input_list[i]
-        # output[i][indexes] = True
+    # for i in range(len(input_list)):
+    #     for col_idx in input_list[i]:
+    #         output[i, col_idx] = True
+
+    # TODO: sanity check
+    for i in range(len(input_list)):
+        print(np.sort(input_list[i]))
+        print(np.nonzero(output[i])[0])
+        print("---------------")
+
     return output
 
-def reduce_by_column(A: NDArray[np.bool], Y: NDArray[np.bool], col: int) -> None:
-    """Choose the first row where the value in `col` is True in A, we'll say it's the `i`th row.
-    Let j be the index of all other rows in A in which the column `col` is also True.
-    Set every row j in A to be A[j] XOR A[i] and set every row j in Y to be Y[j] XOR Y[i]."""
-    rows_where_col_is_true = np.flatnonzero(A[:, col])
-    pivot_idx = rows_where_col_is_true[0]
-    reduce_idx = rows_where_col_is_true[1:]
-    pivot_row_A, pivot_row_Y = A[pivot_idx], Y[pivot_idx]
-    A[reduce_idx] ^= pivot_row_A
-    Y[reduce_idx] ^= pivot_row_Y
-
-def diagonalize_identity(A: NDArray[np.bool], Y: NDArray[np.bool]) -> None:
-    """Assuming A is a "disordered" identity matrix, rearrange it into an "ordered" identity
-    matrix and apply the same row-swaps to Y."""
-    cols = np.argmax(A, axis=1)
-    perm = np.argsort(cols)
-    A_orig, Y_orig = A.copy(), Y.copy()
-    A[:] = A_orig[perm]
-    Y[:] = Y_orig[perm]
+def elimination_step(A: NDArray[np.bool], Y: NDArray[np.bool], pivot_row: int, pivot_col: int) -> bool:
+    """
+    Perform a single gauss-jordan elimination step.
+    Every action taken by the following algorithm on A is also performed on Y.
+    1. Find a row `r` such that `r` >= `pivot_row` and `A[r, pivot_col] == True`.
+       (If no such row exists, stop and return 'False')
+    2. Swap the found row `r` and `pivot_row` so that the vector in `r` is now found in index `pivot_row`
+    3. For every row in A that is not `pivot_row`, XOR it with `A[pivot_row]`
+    4. return 'True'
+    :param A: Boolean 2D numpy matrix we are trying to reduce.
+    :param Y: Boolean 2D numpy matrix on which we apply the same operations as we do on A.
+    :param pivot_row: (int) row index to use as a pivot
+    :param pivot_col: (int) column index to use as a pivot
+    :return: 'True' if changes were made, which should tell the caller that pivot_row should be incremented.
+             Otherwise 'False', which should tell the caller that pivot_row should NOT be incremented
+    """
+    true_in_col = np.flatnonzero(A[:, pivot_col])   # row indexes where the cell in pivot_col is true
+    if true_in_col.size == 0 or true_in_col[-1] < pivot_row:
+        # There are no rows equal-to-or-greater-than pivot_row in which pivot_col is True, move on
+        return False
+    # select row where A[sel, pivot_col] == True and sel >= pivot_row
+    sel_idx = np.argmax(true_in_col >= pivot_row)
+    sel = true_in_col[sel_idx]
+    # sel_vec_A, sel_vec_Y = A[sel].copy(), Y[sel].copy()
+    # switch rows sel and pivot_row, if necessary
+    if sel != pivot_row:
+        A[[sel, pivot_row]] = A[[pivot_row, sel]]
+        Y[[sel, pivot_row]] = Y[[pivot_row, sel]]
+    # on every row in true_in_col other than pivot_row, apply XOR with the vector in row pivot_row (formerly in sel)
+    for r in range(A.shape[0]):
+        if r != pivot_row and A[r, pivot_col]:
+            A[r] ^= A[pivot_row]
+            Y[r] ^= Y[pivot_row]
+    # for r in true_in_col:
+    #     if r != sel:
+    #         A[r] ^= A[pivot_row]
+    #         Y[r] ^= Y[pivot_row]
+    return True
 
 def gauss_jordan_elimination(A_in: NDArray[np.bool], Y_in: NDArray[np.bool]) -> NDArray[np.bool] | None:
     """
     Solve the linear equation Ax=Y via row reduction on the augmented matrix [A|Y]
     :return: x if Ax=Y has a unique solution, otherwise None.
     """
+    # apply reduction
     A, Y = A_in.copy(), Y_in.copy()
-    # reduce by column
-    [reduce_by_column(A, Y, col_idx) for col_idx in range(A.shape[1])]
-    # Make sure A is now a permutation index (one True in every row of A, each True position unique)
-    # That is the same as making sure each row has exactly one 'True' value and so does each column
-    if not np.all(A.sum(axis=1) == 1) or not np.all(A.sum(axis=0) == 1):
-        # If it doesn't pass that check, no solution
-        return None
-    # if it does pass the checks, diagonalize A and apply the same row swaps to Y
-    diagonalize_identity(A, Y)
-    # since A is the identity matrix, Ax=Y <=> x=Y, therefor we return Y
+    pivot_row = 0
+    for pivot_col in range(A.shape[1]):
+        if pivot_row >= A.shape[0]:
+            break
+        if elimination_step(A, Y, pivot_row, pivot_col):
+            pivot_row += 1
+
+    # Y should now equal x, validate result
+    for row in range(A.shape[0]):
+        # if any row has A[row] == 0 but Y[row] != 0, the solution is inconsistent
+        if np.all(A[row] == 0) and np.any(Y[row] != 0):
+            return None
+
+    # validated, Y equals x
     return Y
 
+
+# TODO: ===== GAUSS_JORDAN_ELIMINATION TESTS =====
+if __name__ == "__main__":
+    original_data = np.array([0,1,0,1,0,0,1,1,1], dtype=np.bool)
+    segments = original_data.reshape((3,3))
+    print("segments:")
+    print(segments)
+    drop_seg_map = np.array([[1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1]], dtype=np.bool)
+    # drop_seg_map = form_into_mat()
+    payload_lists = [np.bitwise_xor.reduce(segments[mask]) for mask in drop_seg_map]
+    payload_mat = np.stack(payload_lists)
+    print("payload mat:")
+    print(payload_mat)
+    print("result of gauss jordan elimination:")
+    print(gauss_jordan_elimination(drop_seg_map, payload_mat))

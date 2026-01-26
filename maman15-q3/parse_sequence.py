@@ -18,7 +18,7 @@ def split_into_unique_segments(seq: str, div_by: int = 0) -> List[str]:
     """
     seq_len = len(seq)
     # length options are all values which the input's length is divisible by AND are divisible by div_by
-    len_options = [i for i in range(1, seq_len, 1) if (seq_len % i == 0) and (i % div_by == 0)]
+    len_options = [i for i in range(1, seq_len, 1) if (seq_len % i == 0) and ((div_by == 0) or (i % div_by == 0))]
     # search through length candidates in descending order, for each length check if it forms unique segments
     for l in len_options:
         segments = [seq[i: i + l] for i in range(0, seq_len, l)]    # generate segments
@@ -77,3 +77,32 @@ def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 10,
 def np_binary_to_str(arr: NDArray[np.bool]) -> str:
     """Convert boolean numpy array to a string of 0s and 1s"""
     return "".join(["1" if arr[i] else "0" for i in range(len(arr))])
+
+
+# TODO: =====SANITY TEST=====
+if __name__ == "__main__":
+    # uint to binary and back to uint
+    uint_arr = np.random.default_rng().integers(0, 999999, size=10).tolist()
+    uint_to_binary_result = [uint_to_binary(entry) for entry in uint_arr]
+    back_to_uint_result = [binary_to_uint(entry) for entry in uint_to_binary_result]
+    if all([orig == decoded for orig, decoded in zip(uint_arr, back_to_uint_result)]):
+        print("passed uint to binary to uint test")
+    else:
+        print("UINT TO BINARY TO UINT IS FUCKED")
+        print(uint_arr)
+        print(back_to_uint_result)
+    # split
+    full_sentence = "000111111000101100001000000010000010111000010010100111100110000100000000000000110011000000110"
+    segs = split_into_unique_segments(full_sentence)
+    recon = "".join(segs)
+    if recon == recon:
+        print("passed sentence splitting test")
+    else:
+        print("SENTENCE SPLITTING FUCKED")
+        print(full_sentence)
+        print(segs)
+        print(recon)
+    # bucket test
+    prefixed = ["CATKITTY", "DOGDOGGY", "DOGSHITTER", "CATDIPSHIT", "LEGHAIR"]
+    bucketed = bucket_strings_by_prefix(prefixed, 3, True)
+    print(bucketed)

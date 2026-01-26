@@ -6,6 +6,7 @@ import parse_sequence
 import transcode
 from DropletGenerator import IDX_DTYPE, MASTER_SEED, BARCODE_BASES, DropletGenerator
 from collections import Counter
+from gauss_jordan_elimination import form_into_mat, gauss_jordan_elimination
 
 # constants
 
@@ -20,7 +21,7 @@ BASE_REP_MARGIN_MAX = 1 - BASE_REP_MARGIN
 BASE_REP_MARGIN_BELOW_HALF = 0.5 - BASE_REP_MARGIN
 BASE_REP_MARGIN_ABOVE_HALF = 0.5 + BASE_REP_MARGIN
 # clusters (by barcode) which have fewer than this many strands are discarded
-MIN_IN_CLUSTER = 10
+MIN_IN_CLUSTER = 4
 
 def _consensus_char(n: int, sequences: List[str]) -> Tuple[str, str]:
     """
@@ -84,3 +85,16 @@ def sequence_droplet(sequences: List[str]) -> List[NDArray[np.bool]]:
         output.append(transcode.from_words_to_np(in_language))  # convert language into binary
         # TODO: error correction???
     return output
+
+def decode_data(sequences: List[NDArray[np.bool]], segment_ids: List[NDArray[IDX_DTYPE]]) -> NDArray[np.bool]:
+    """
+    Decode data from list of sequences and their associated segments
+    :param sequences: list of boolean numpy arrays representing a binary string.
+                      Sequences should contain ONLY THE DATA PORTION, meaning no barcode or seed.
+    :param segment_ids: for every `i`, segment_ids[i] contains a list of segment indexes that
+                        the sequence sequences[i] encodes.
+    :return: boolean numpy array representing the binary string that is the decoded data
+    """
+    A, Y = form_into_mat(segment_ids), form_into_mat(sequences)
+    output = gauss_jordan_elimination(A, Y)
+    return output.flatten()
