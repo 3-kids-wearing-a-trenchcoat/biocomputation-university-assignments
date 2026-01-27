@@ -83,7 +83,7 @@ class DropletGenerator:
     def gen_barcode(rng) -> NDArray[np.bool]:
         """Generate a barcode made up only of letters that are not expressed by
         a 50-50 ratio of bases in its DNA representation"""
-        return rng.choice(ALLOWED_BARCODE_BIN, BARCODE_BASES).flatten()
+        return rng.choice(ALLOWED_BARCODE_BIN, int(BARCODE_BASES / 2)).flatten()
 
     def gen_droplet(self) -> NDArray[np.bool]:
         """
