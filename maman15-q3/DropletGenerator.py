@@ -12,10 +12,12 @@ POSSIBLE_RANKS = [2, 13]  # a droplet randomly chooses one of these two rank val
 IDX_DTYPE = np.uint64
 MASTER_SEED = 43523345234
 BARCODE_BASES = 10        # number of bases that make up each barcode, a base is effectively equivalent to 2-bits
-# BARCODE_BITS = BARCODE_BASES * 2
 BARCODE_BITS = ceil((BARCODE_BASES / 2) * 5)
 BARCODE_UPPER_BOUND = 2 ** BARCODE_BITS    # Max decimal value of a barcode
 BULK_GENERATION_OVERHEAD = 0.3
+DISALLOWED_LETTERS_IN_BARCODE = {"Y", "Z"}   # limit barcode letters to those that are not 50-50 rep in DNA
+ALLOWED_BARCODE_BIN = [entry[1] for entry in transcode.WORD_BIT_PAIRS
+                       if not any(forbidden in entry[0] for forbidden in DISALLOWED_LETTERS_IN_BARCODE)]
 
 def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
     """
@@ -76,12 +78,12 @@ class DropletGenerator:
             return False
         self.used_barcode_values.add(barcode_tup)
         return True
-        # if barcode < 0:
-        #     raise ValueError("barcode decimal representation must be a non-negative integer")
-        # if barcode in self.used_barcode_values:
-        #     return False
-        # self.used_barcode_values.add(barcode)
-        # return True
+
+    @staticmethod
+    def gen_barcode(rng) -> NDArray[np.bool]:
+        """Generate a barcode made up only of letters that are not expressed by
+        a 50-50 ratio of bases in its DNA representation"""
+        return rng.choice(ALLOWED_BARCODE_BIN, BARCODE_BASES).flatten()
 
     def gen_droplet(self) -> NDArray[np.bool]:
         """
@@ -105,9 +107,11 @@ class DropletGenerator:
         segments_idx = droplet_rng.choice(self.seg_idx, rank, replace=False)
 
         # Generate a unique barcode
-        barcode = droplet_rng.choice([True, False], BARCODE_BITS)
+        # barcode = droplet_rng.choice([True, False], BARCODE_BITS)
+        barcode = self.gen_barcode(droplet_rng)
         while not self.check_barcode(barcode):
-            barcode = droplet_rng.choice([True, False], BARCODE_BITS)
+            # barcode = droplet_rng.choice([True, False], BARCODE_BITS)
+            barcode = self.gen_barcode(droplet_rng)
 
         # calculate payload -- the portion of the droplet's sequence that actually contains the data
         payload = np.bitwise_xor.reduce([self.segments[i] for i in segments_idx])
