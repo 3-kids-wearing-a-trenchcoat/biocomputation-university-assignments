@@ -99,13 +99,15 @@ def gauss_jordan_elimination(A_in: NDArray[np.bool], Y_in: NDArray[np.bool]) -> 
             pivot_row += 1
 
     # Y should now equal x, validate result
+    # TODO: rank should probably be explicitly tested, maybe.
     for row in range(A.shape[0]):
         # if any row has A[row] == 0 but Y[row] != 0, the solution is inconsistent
         if np.all(A[row] == 0) and np.any(Y[row] != 0):
             return None
 
-    # validated, Y equals x
-    return Y
+    # truncate from Y all zero rows
+    non_zero_rows_mask = np.any(Y, axis=1)
+    return Y[non_zero_rows_mask]
 
 
 # TODO: ===== GAUSS_JORDAN_ELIMINATION TESTS =====
