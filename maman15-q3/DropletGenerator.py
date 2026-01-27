@@ -55,25 +55,33 @@ class DropletGenerator:
         # Calculate number of seeds needed and choose that many seeds randomly
         self.seed_num, self.seed_binary_length = calc_number_of_seeds(len(self.segments))
         self.used_barcode_values = set()
-
         # I am working with the assumption that seed_binary_length, BARCODE_BITS
         # and the sequence length are all divisible by bits_per_word, meaning so is the concatenated droplet sequence
+        # TODO: SANITY CHECK
+        self.seeds_made_in_order = []
+        self.bin_seeds_made_in_order = []
 
     # ===== ENCODING PHASE =====
 
-    def check_barcode(self, barcode: int) -> bool:
+    # def check_barcode(self, barcode: int) -> bool:
+    def check_barcode(self, barcode: NDArray[np.bool]) -> bool:
         """
         Check if the given barcode has been used before. If not, add it to the set of used barcodes
-        :param barcode: decimal representation of desired barcode value, must be a non-negative integer
+        :param barcode: binary value of barcode represented by a boolean numpy array
         :return: 'True' if this barcode wasn't found in the used set, otherwise 'False'.
                  (More accurately; 'True' means this barcode has JUST been added to the used barcode values)
         """
-        if barcode < 0:
-            raise ValueError("barcode decimal representation must be a non-negative integer")
-        if barcode in self.used_barcode_values:
+        barcode_tup = tuple(barcode.tolist())
+        if barcode_tup in self.used_barcode_values:
             return False
-        self.used_barcode_values.add(barcode)
+        self.used_barcode_values.add(barcode_tup)
         return True
+        # if barcode < 0:
+        #     raise ValueError("barcode decimal representation must be a non-negative integer")
+        # if barcode in self.used_barcode_values:
+        #     return False
+        # self.used_barcode_values.add(barcode)
+        # return True
 
     def gen_droplet(self) -> NDArray[np.bool]:
         """
@@ -84,25 +92,27 @@ class DropletGenerator:
         # Choose seed for droplet
         # seed = self.rng.integers(0, self.seed_num).astype(IDX_DTYPE)
         seed = int(self.rng.integers(0, self.seed_num))
+        seed_bin = parse_sequence.uint_to_binary(seed, self.seed_binary_length)
+
+        # TODO: sanity check
+        self.seeds_made_in_order.append(seed)
+
         droplet_rng = np.random.default_rng(seed)
         # randomly choose INDEX OF rank and then choose SEGMENT INDEXES accordingly
         # THE ORDER IS IMPORTANT as we'll rely on it for decoding
         rank_idx = droplet_rng.integers(0, len(POSSIBLE_RANKS))
         rank = POSSIBLE_RANKS[rank_idx]
         segments_idx = droplet_rng.choice(self.seg_idx, rank, replace=False)
+
         # Generate a unique barcode
-        barcode = droplet_rng.integers(0, BARCODE_UPPER_BOUND)
-        while True:
-            if self.check_barcode(barcode):
-                break
-            barcode = droplet_rng.integers(0, BARCODE_UPPER_BOUND)
-        # Get binary representation for barcode and seed
-        barcode_bin = parse_sequence.uint_to_binary(barcode, BARCODE_BITS)  # binary representation of barcode
-        seed_bin = parse_sequence.uint_to_binary(seed, self.seed_binary_length)
+        barcode = droplet_rng.choice([True, False], BARCODE_BITS)
+        while not self.check_barcode(barcode):
+            barcode = droplet_rng.choice([True, False], BARCODE_BITS)
+
         # calculate payload -- the portion of the droplet's sequence that actually contains the data
         payload = np.bitwise_xor.reduce([self.segments[i] for i in segments_idx])
         # droplet sequence as a concatenation (in order) of barcode_bin, seed_bin and payload
-        sequence = np.concatenate((barcode_bin, seed_bin, payload))
+        sequence = np.concatenate((barcode, seed_bin, payload))
         # Append zeros to the end of the sequence if necessary
         return sequence
 

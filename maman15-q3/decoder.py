@@ -58,7 +58,7 @@ def _build_by_consensus(sequences) -> Tuple[str, str]:
     :return:
     """
     # Filter so that only sequences of the most common length are kept
-    # (This filters out corruptions caused by missing or "extra" bases
+    # (This filters out corruptions caused by missing or "extra" bases)
     target_len = max([len(s) for s in sequences])
     seqs = [seq for seq in sequences if len(seq) == target_len]
     # Build the two output strings, character by character, using _consensus_char
