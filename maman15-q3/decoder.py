@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from typing import List, Tuple, Dict
 import parse_sequence
 import transcode
-from DropletGenerator import IDX_DTYPE, MASTER_SEED, BARCODE_BASES, DropletGenerator
+from DropletGenerator import IDX_DTYPE, BARCODE_BASES
 from collections import Counter
 from gauss_jordan_elimination import form_into_mat, gauss_jordan_elimination
 

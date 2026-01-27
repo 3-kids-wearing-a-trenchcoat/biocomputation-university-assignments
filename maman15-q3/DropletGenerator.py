@@ -59,9 +59,6 @@ class DropletGenerator:
         self.used_barcode_values = set()
         # I am working with the assumption that seed_binary_length, BARCODE_BITS
         # and the sequence length are all divisible by bits_per_word, meaning so is the concatenated droplet sequence
-        # TODO: SANITY CHECK
-        self.seeds_made_in_order = []
-        self.bin_seeds_made_in_order = []
 
     # ===== ENCODING PHASE =====
 
@@ -92,12 +89,8 @@ class DropletGenerator:
         :return: boolean NDArray representing the binary sequence
         """
         # Choose seed for droplet
-        # seed = self.rng.integers(0, self.seed_num).astype(IDX_DTYPE)
         seed = int(self.rng.integers(0, self.seed_num))
         seed_bin = parse_sequence.uint_to_binary(seed, self.seed_binary_length)
-
-        # TODO: sanity check
-        self.seeds_made_in_order.append(seed)
 
         droplet_rng = np.random.default_rng(seed)
         # randomly choose INDEX OF rank and then choose SEGMENT INDEXES accordingly
@@ -107,10 +100,8 @@ class DropletGenerator:
         segments_idx = droplet_rng.choice(self.seg_idx, rank, replace=False)
 
         # Generate a unique barcode
-        # barcode = droplet_rng.choice([True, False], BARCODE_BITS)
         barcode = self.gen_barcode(droplet_rng)
         while not self.check_barcode(barcode):
-            # barcode = droplet_rng.choice([True, False], BARCODE_BITS)
             barcode = self.gen_barcode(droplet_rng)
 
         # calculate payload -- the portion of the droplet's sequence that actually contains the data

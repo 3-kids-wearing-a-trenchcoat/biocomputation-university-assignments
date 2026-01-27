@@ -3,9 +3,7 @@ from DropletGenerator import DropletGenerator
 from typing import List
 from decoder import sequence_droplet, decode_data
 from parse_sequence import np_binary_to_str
-import numpy as np
-import random
-import transcode
+from random import shuffle
 
 #constants
 COPIES_PER_OLIGOMER = 100
@@ -42,36 +40,13 @@ def encode(generator: DropletGenerator, copies_per_oligomer: int = COPIES_PER_OL
     :return: List of strings representing DNA sequences
     """
     oligomers = generator.bulk_gen_as_DNA() * copies_per_oligomer
-    # random.shuffle(oligomers)
+    shuffle(oligomers)
     return oligomers
 
 def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5):
     droplet_generator = DropletGenerator(input_seq, bits_per_word)
     oligomers = encode(droplet_generator)
     sequenced_oligomers = sequence_droplet(oligomers)
-
-    # place right after `sequenced_oligomers = sequence_droplet(oligomers)`
-    mismatches = []
-    for i, seq in enumerate(sequenced_oligomers):
-        # seq is boolean ndarray WITHOUT barcode (this is how your pipeline supplies it)
-        # 1) decode seed / segments from sequence (what your code does)
-        seg_idxs = droplet_generator.find_segments(seq)
-        # 2) recompute the payload that generator *should* have produced
-        recomputed_payload = np.bitwise_xor.reduce([droplet_generator.segments[int(j)] for j in seg_idxs])
-        # 3) extract decoder's payload portion from seq (your pipeline removes barcode; first bits are seed)
-        seed_len = droplet_generator.seed_binary_length
-        decoder_payload = seq[seed_len:]  # same as you take in main
-        if not np.array_equal(decoder_payload, recomputed_payload):
-            mismatches.append((i, seg_idxs, decoder_payload, recomputed_payload))
-
-    print("MISMATCH COUNT:", len(mismatches))
-    if mismatches:
-        # print a few examples in human-readable form
-        for idx, segs, dec_pl, rec_pl in mismatches[:10]:
-            print("Droplet", idx, "segments:", segs)
-            print("decoded payload (first 64 bits):", dec_pl[:64].astype(int).tolist())
-            print("recomputed payload (first 64 bits):", rec_pl[:64].astype(int).tolist())
-            print("---")
 
     segment_idxs = [droplet_generator.find_segments(entry) for entry in sequenced_oligomers]
     data = [seq[droplet_generator.seed_binary_length:] for seq in sequenced_oligomers]

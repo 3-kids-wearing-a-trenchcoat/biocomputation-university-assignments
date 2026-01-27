@@ -10,7 +10,7 @@ For the purposes of decoding DNA storage, the matrices will be:
 from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
-from typing import List, Tuple
+from typing import List
 from DropletGenerator import IDX_DTYPE
 
 def form_into_mat(input_list: List[NDArray[np.bool]] | List[NDArray[IDX_DTYPE]]) -> NDArray[np.bool]:
@@ -24,25 +24,14 @@ def form_into_mat(input_list: List[NDArray[np.bool]] | List[NDArray[IDX_DTYPE]])
                             index found in all vectors plus 1.
     :return: boolean numpy 2D matrix of shape (len(input_list), <length of vector>)
     """
-    if input_list[0].dtype == np.bool:
+    if input_list[0].dtype == np.bool:  # if input_list is a binary string
         output = np.stack(input_list, dtype=np.bool)
         return output
-
     # else, dtype is uint
     vec_len = max([np.max(vec) for vec in input_list]) + 1
     output = np.zeros((len(input_list), vec_len), dtype=np.bool)
     for i in range(len(input_list)):
         output[i][input_list[i]] = True
-    # for i in range(len(input_list)):
-    #     for col_idx in input_list[i]:
-    #         output[i, col_idx] = True
-
-    # # TODO: sanity check
-    # for i in range(len(input_list)):
-    #     print(np.sort(input_list[i]))
-    #     print(np.nonzero(output[i])[0])
-    #     print("---------------")
-
     return output
 
 def elimination_step(A: NDArray[np.bool], Y: NDArray[np.bool], pivot_row: int, pivot_col: int) -> bool:
@@ -65,10 +54,8 @@ def elimination_step(A: NDArray[np.bool], Y: NDArray[np.bool], pivot_row: int, p
     if true_in_col.size == 0 or true_in_col[-1] < pivot_row:
         # There are no rows equal-to-or-greater-than pivot_row in which pivot_col is True, move on
         return False
-    # select row where A[sel, pivot_col] == True and sel >= pivot_row
     sel_idx = np.argmax(true_in_col >= pivot_row)
     sel = true_in_col[sel_idx]
-    # sel_vec_A, sel_vec_Y = A[sel].copy(), Y[sel].copy()
     # switch rows sel and pivot_row, if necessary
     if sel != pivot_row:
         A[[sel, pivot_row]] = A[[pivot_row, sel]]
@@ -78,10 +65,6 @@ def elimination_step(A: NDArray[np.bool], Y: NDArray[np.bool], pivot_row: int, p
         if r != pivot_row and A[r, pivot_col]:
             A[r] ^= A[pivot_row]
             Y[r] ^= Y[pivot_row]
-    # for r in true_in_col:
-    #     if r != sel:
-    #         A[r] ^= A[pivot_row]
-    #         Y[r] ^= Y[pivot_row]
     return True
 
 def gauss_jordan_elimination(A_in: NDArray[np.bool], Y_in: NDArray[np.bool]) -> NDArray[np.bool] | None:
@@ -101,26 +84,9 @@ def gauss_jordan_elimination(A_in: NDArray[np.bool], Y_in: NDArray[np.bool]) -> 
     # Y should now equal x, validate result
     # TODO: rank should probably be explicitly tested, maybe.
     for row in range(A.shape[0]):
-        # if any row has A[row] == 0 but Y[row] != 0, the solution is inconsistent
         if np.all(A[row] == 0) and np.any(Y[row] != 0):
             return None
 
     # truncate from Y all zero rows
     non_zero_rows_mask = np.any(Y, axis=1)
     return Y[non_zero_rows_mask]
-
-
-# TODO: ===== GAUSS_JORDAN_ELIMINATION TESTS =====
-if __name__ == "__main__":
-    original_data = np.array([0,1,0,1,0,0,1,1,1], dtype=np.bool)
-    segments = original_data.reshape((3,3))
-    print("segments:")
-    print(segments)
-    drop_seg_map = np.array([[1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1]], dtype=np.bool)
-    # drop_seg_map = form_into_mat()
-    payload_lists = [np.bitwise_xor.reduce(segments[mask]) for mask in drop_seg_map]
-    payload_mat = np.stack(payload_lists)
-    print("payload mat:")
-    print(payload_mat)
-    print("result of gauss jordan elimination:")
-    print(gauss_jordan_elimination(drop_seg_map, payload_mat))

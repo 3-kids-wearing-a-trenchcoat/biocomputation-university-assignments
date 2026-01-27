@@ -26,7 +26,6 @@ def split_into_unique_segments(seq: str, div_by: int = 0) -> List[str]:
         # number of elements, since no element would be pruned due to uniqueness
         if len(segments) == len(set(segments)):
             return segments # if the segments really are unique, return them
-        # print("failed for length " + str(l) + ". size of set is " + str(len(set(segments))) + " whereas num of segments is " + str(len(segments)) +".")
     return [seq]    # no satisfactory segmentation found, return list containing the input
 
 def convert_str_to_bool_ndarray(s: str) -> NDArray[np.bool]:
@@ -51,8 +50,6 @@ def uint_to_binary(x: int, width: int = 5) -> NDArray[np.bool]:
 
 def binary_to_uint(bits: NDArray[np.bool]) -> int:
     return int("".join("1" if b else "0" for b in bits), 2)
-    # output_str = "".join("1" if b else "0" for b in bits)
-    # return int(output_str, 2)
 
 def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 10,
                              discard_prefix: bool = False) -> Dict[str, List[str]]:
@@ -77,32 +74,3 @@ def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 10,
 def np_binary_to_str(arr: NDArray[np.bool]) -> str:
     """Convert boolean numpy array to a string of 0s and 1s"""
     return "".join(["1" if arr[i] else "0" for i in range(len(arr))])
-
-
-# TODO: =====SANITY TEST=====
-if __name__ == "__main__":
-    # uint to binary and back to uint
-    uint_arr = np.random.default_rng().integers(0, 999999, size=10).tolist()
-    uint_to_binary_result = [uint_to_binary(entry) for entry in uint_arr]
-    back_to_uint_result = [binary_to_uint(entry) for entry in uint_to_binary_result]
-    if all([orig == decoded for orig, decoded in zip(uint_arr, back_to_uint_result)]):
-        print("passed uint to binary to uint test")
-    else:
-        print("UINT TO BINARY TO UINT IS FUCKED")
-        print(uint_arr)
-        print(back_to_uint_result)
-    # split
-    full_sentence = "000111111000101100001000000010000010111000010010100111100110000100000000000000110011000000110"
-    segs = split_into_unique_segments(full_sentence)
-    recon = "".join(segs)
-    if recon == recon:
-        print("passed sentence splitting test")
-    else:
-        print("SENTENCE SPLITTING FUCKED")
-        print(full_sentence)
-        print(segs)
-        print(recon)
-    # bucket test
-    prefixed = ["CATKITTY", "DOGDOGGY", "DOGSHITTER", "CATDIPSHIT", "LEGHAIR"]
-    bucketed = bucket_strings_by_prefix(prefixed, 3, True)
-    print(bucketed)
