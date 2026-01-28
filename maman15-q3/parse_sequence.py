@@ -64,7 +64,8 @@ def bucket_strings_by_prefix(strings: List[str], prefix_len: int = 10,
     buckets: Dict[str, List[str]] = dict()
     for s in strings:
         if len(s) < prefix_len:
-            raise ValueError("At least one of the input strings is shorter than the prefix length")
+            # raise ValueError("At least one of the input strings is shorter than the prefix length")
+            continue
         key = s[:prefix_len]
         if buckets.get(key) is None:
             buckets[key] = []

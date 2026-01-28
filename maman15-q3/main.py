@@ -116,7 +116,7 @@ if __name__ == "__main__":
     successes = 0
     total = 100
     for _ in trange(total, desc="running experiments", dynamic_ncols=True):
-        if EXAMPLE_SEQUENCE == run_experiment(seed_length=15, print_messages=False, sub_error_prob=0,
-                                              del_error_prob=0.2, insert_error_prob=0):
+        if EXAMPLE_SEQUENCE == run_experiment(seed_length=15, print_messages=False, sub_error_prob=1e-4,
+                                              del_error_prob=1e-4, insert_error_prob=0):
             successes += 1
     print(str(successes) + " successful tests out of " + str(total))
