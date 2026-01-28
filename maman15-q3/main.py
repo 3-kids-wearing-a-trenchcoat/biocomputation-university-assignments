@@ -4,7 +4,7 @@ from typing import List
 from decoder import sequence_droplet, decode_data
 from parse_sequence import np_binary_to_str
 from random import shuffle
-from error_generator import inject_substitution_error
+from error_generator import inject_substitution_error, inject_deletion_error
 
 #constants
 COPIES_PER_OLIGOMER = 100
@@ -71,6 +71,9 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
     replacement_errors = inject_substitution_error(oligomers, sub_error_prob)
     if print_messages:
         print("Replacement errors injected: " + str(replacement_errors))
+    deletion_errors = inject_deletion_error(oligomers, del_error_prob)
+    if print_messages:
+        print("Deletion errors injected: " + str(deletion_errors))
 
     sequenced_oligomers = sequence_droplet(oligomers)
     segment_idxs = [droplet_generator.find_segments(entry) for entry in sequenced_oligomers]
@@ -90,4 +93,5 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
     return decoded_seq
 
 if __name__ == "__main__":
-    print(run_experiment(seed_length=15, print_messages=True, sub_error_prob= 1e-6))
+    print(run_experiment(seed_length=15, print_messages=True, sub_error_prob= 1e-6,
+                         del_error_prob=1e-6))
