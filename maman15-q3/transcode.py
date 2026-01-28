@@ -40,6 +40,12 @@ BASE_PAIR_TO_LETTER = {entry[1]: entry[0] for entry in LETTER_BASE_MAP}
 
 # functions
 def from_np_to_words(seq: NDArray[np.bool], word_len: int = 5) -> str:
+    """
+    Translate a binary sequence into the words it represents.
+    :param seq: Binary sequence in the form of a boolean numpy array
+    :param word_len: length of word in bits
+    :return: a string of the decoded word
+    """
     substrings: List[str] = []
     # assuming seq's length is divisible by word_len
     for start in range(0, seq.size, word_len):
@@ -49,6 +55,12 @@ def from_np_to_words(seq: NDArray[np.bool], word_len: int = 5) -> str:
     return "".join(substrings)
 
 def from_words_to_np(seq: str, letters_in_word: int = 2) -> NDArray[np.bool]:
+    """
+    Generate the binary representation of the input phrase.
+    :param seq: input phrase given as a string
+    :param letters_in_word: Number of letters in a word, all words are assumed to be made up of exactly these many letters.
+    :return: Boolean numpy array representing the binary sequence encoding the phrase.
+    """
     bin_words = [np.array(WORD_TO_BITS[seq[i: i + letters_in_word]], dtype=np.bool) for i in range(0, len(seq), 2)]
     return np.concatenate(bin_words)
 
@@ -74,5 +86,11 @@ def _get_letter_by_base_pair(base1: str, base2: str) -> str:
     return BASE_PAIR_TO_LETTER[pair]
 
 def from_DNA_to_words(strand1: str, strand2: str) -> str:
+    """
+    Covert a given DNA representation into a language sequence.
+    The given DNA representation is represented by two strands that may be different.
+    That is because certain letters (Y and Z) in the language are represented by a 50-50 ratio of different
+    bases in DNA.
+    """
     out_arr: List[str] = [_get_letter_by_base_pair(base1, base2) for base1, base2 in zip(strand1, strand2)]
     return "".join(out_arr)
