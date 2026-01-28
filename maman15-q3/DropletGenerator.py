@@ -14,7 +14,7 @@ MASTER_SEED = 43523345234
 BARCODE_BASES = 10        # number of bases that make up each barcode, a base is effectively equivalent to 2-bits
 BARCODE_BITS = ceil((BARCODE_BASES / 2) * 5)
 BARCODE_UPPER_BOUND = 2 ** BARCODE_BITS    # Max decimal value of a barcode
-BULK_GENERATION_OVERHEAD = 0.3
+BULK_GENERATION_OVERHEAD = 0.05
 DISALLOWED_LETTERS_IN_BARCODE = {"Y", "Z"}   # limit barcode letters to those that are not 50-50 rep in DNA
 ALLOWED_BARCODE_BIN = [entry[1] for entry in transcode.WORD_BIT_PAIRS
                        if not any(forbidden in entry[0] for forbidden in DISALLOWED_LETTERS_IN_BARCODE)]
@@ -62,9 +62,6 @@ class DropletGenerator:
         # I am working with the assumption that seed_binary_length, BARCODE_BITS
         # and the sequence length are all divisible by bits_per_word, meaning so is the concatenated droplet sequence
 
-    # ===== ENCODING PHASE =====
-
-    # def check_barcode(self, barcode: int) -> bool:
     def check_barcode(self, barcode: NDArray[np.bool]) -> bool:
         """
         Check if the given barcode has been used before. If not, add it to the set of used barcodes
@@ -132,8 +129,8 @@ class DropletGenerator:
     def bulk_gen_as_DNA(self, n: int|None = None) -> List[str]:
         """
         Generate several droplets at once using gen_droplet
-        :param n:
-        :return:
+        :param n: Number of droplets to generate (optional - if left None will fall on bulk_gen_droplets' default)
+        :return: List of strings representing DNA strands
         """
         droplets: List[str] = self.bulk_gen_droplets(True, n)
         DNA_pairs = [transcode.from_words_to_DNA(entry) for entry in droplets]
