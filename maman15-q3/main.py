@@ -113,7 +113,7 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
 
 if __name__ == "__main__":
     successes = 0
-    total = 400
+    total = 100
     seq = EXAMPLE_SEQUENCE
     seed_length = 15
     sub_error = 1e-3
