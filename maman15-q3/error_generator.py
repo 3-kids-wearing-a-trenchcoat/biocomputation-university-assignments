@@ -1,11 +1,12 @@
 from __future__ import annotations
 from typing import List
 import numpy as np
+
 DEFAULT_PROB = 1e-6 # default error probability for any single event
 SUB_OPTIONS = {"T": ["G", "C", "A"], "G": ["T", "C", "A"],
                "C": ["T", "G", "A"], "A": ["T", "G", "C"]}
 CHAR_OPTIONS = ["T","G","C","A"]
-RNG = np.random.default_rng()
+RNG = np.random.default_rng(1234567)
 
 def inject_substitution_error(input_list: List[str], prob: float = DEFAULT_PROB) -> int:
     """
