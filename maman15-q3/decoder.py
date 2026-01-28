@@ -17,7 +17,7 @@ from gauss_jordan_elimination import form_into_mat, gauss_jordan_elimination
 # If a base's occurrence fraction is between [1 - margin, 1], we consider this to be a single-base represented letter.
 # If neither, some terrible mass-data-corruption took place.
 BASE_REP_MARGIN = 0.1
-BASE_REP_MARGIN_MAX = 1 - BASE_REP_MARGIN
+# BASE_REP_MARGIN_MAX = 1 - BASE_REP_MARGIN
 BASE_REP_MARGIN_BELOW_HALF = 0.5 - BASE_REP_MARGIN
 BASE_REP_MARGIN_ABOVE_HALF = 0.5 + BASE_REP_MARGIN
 # clusters (by barcode) which have fewer than this many strands are discarded
@@ -40,16 +40,13 @@ def _consensus_char(n: int, sequences: List[str]) -> Tuple[str, str]:
     candidate1, candidate2 = counts.most_common(2)  # get the two most common characters and their occurrence num
     total_occurrences = counts.total()
     base1, frac1 = candidate1[0], candidate1[1] / total_occurrences
-    # if the most common base's occurrence fraction is within the margin to 100%, return it.
-    if frac1 >= BASE_REP_MARGIN_MAX:
-        return base1, base1
     base2, frac2 = candidate2[0], candidate2[1] / total_occurrences
     # If the two most common bases are within margin of splitting 50-50, return both in lexicographic order
     if (BASE_REP_MARGIN_BELOW_HALF <= frac1 <= BASE_REP_MARGIN_ABOVE_HALF and
         BASE_REP_MARGIN_BELOW_HALF <= frac2 <= BASE_REP_MARGIN_ABOVE_HALF):
         return (base1, base2) if (base1 < base2) else (base2, base1)
-    raise ValueError("Failed to obtain consensus among sequences for character " + str(n) + ".  "
-                     "This suggests some disastrous data corruption took place.")
+    # Otherwise, return the most frequent occurring base
+    return base1, base1
 
 def _build_by_consensus(sequences) -> Tuple[str, str]:
     """
@@ -90,7 +87,17 @@ def sequence_droplet(sequences: List[str]) -> List[NDArray[np.bool]]:
         if len(bucket) < MIN_IN_CLUSTER:
             continue    # ignore buckets below the minimum size
         strand1, strand2 = _build_by_consensus(bucket)  # recreate the two representative DNA strands via consensus
-        in_language = transcode.from_DNA_to_words(strand1, strand2) # convert the two representative strands into the language
+        try:
+            in_language = transcode.from_DNA_to_words(strand1, strand2) # convert the two representative strands into the language
+        except KeyError:
+            # If key error encountered, it means we've got an un-mapped pair of bases in strand1 and strand2.
+            # Meaning this bucket is corrupt beyond use, skip it and hope the other buckets can make up for it.
+            continue
+        if len(strand1) % 2 == 1 or len(strand2) % 2 == 1:
+            # if strands are made of an odd number of words, it is necessarily missing some data
+            # as every word in the language is made up of two letters.
+            # In this case, this bucket is deemed too corrupt to use, and we skip it in the output
+            continue
         output.append(transcode.from_words_to_np(in_language))  # convert language into binary
     return output
 
