@@ -81,10 +81,11 @@ def gauss_jordan_elimination(A_in: NDArray[np.bool], Y_in: NDArray[np.bool]) -> 
         if elimination_step(A, Y, pivot_row, pivot_col):
             pivot_row += 1
 
-    # Y should now equal x, validate result
-    for row in range(A.shape[0]):
-        assert np.all(A[row] == 0) and np.any(Y[row] != 0)
-
     # Remove all zero rows from Y before returning it
     non_zero_rows_mask = np.any(A, axis=1)
+    # validate that removed rows from Y are actually all non-zero rows
+    assert np.all(Y[~non_zero_rows_mask] == 0)
+    # validate that remaining rows in Y are all non-zero rows
+    assert np.all(np.any(Y[non_zero_rows_mask] != 0, axis=1))
+    # return
     return Y[non_zero_rows_mask]
