@@ -21,7 +21,7 @@ BASE_REP_MARGIN = 0.1
 BASE_REP_MARGIN_BELOW_HALF = 0.5 - BASE_REP_MARGIN
 BASE_REP_MARGIN_ABOVE_HALF = 0.5 + BASE_REP_MARGIN
 # clusters (by barcode) which have fewer than this many strands are discarded
-MIN_IN_CLUSTER = 4
+MIN_IN_CLUSTER = 10
 
 def _consensus_char(n: int, sequences: List[str]) -> Tuple[str, str]:
     """
@@ -100,7 +100,10 @@ def sequence_droplet(sequences: List[str], min_in_cluster: int = MIN_IN_CLUSTER)
             # as every word in the language is made up of two letters.
             # In this case, this bucket is deemed too corrupt to use, and we skip it in the output
             continue
-        output.append(transcode.from_words_to_np(in_language))  # convert language into binary
+        try:
+            output.append(transcode.from_words_to_np(in_language))  # convert language into binary
+        except KeyError:
+            continue
     return output
 
 def decode_data(sequences: List[NDArray[np.bool]], segment_ids: List[NDArray[IDX_DTYPE]]) -> NDArray[np.bool]:
