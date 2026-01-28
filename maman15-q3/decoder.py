@@ -53,9 +53,16 @@ def _consensus_char(n: int, sequences: List[str]) -> Tuple[str, str]:
 
 def _build_by_consensus(sequences) -> Tuple[str, str]:
     """
-
-    :param sequences:
-    :return:
+    Construct the DNA representation of the data by forming a consensus among all given strings.
+    Iteratively, each position in all the given strings is examined and the most common character is chosen
+    as the consensus character UNLESS the two most common characters are (within a margin) split 50-50,
+    in which case another letter is represented.
+    :param sequences: list of DNA sequences represented as strings
+    :return: Two strings representing the consensus DNA representation of the data.
+             For each index `n`, the `n`th character of the output will be the consensus at pos `n`.
+             Meaning if there isn't a 50-50 split (within margin), both strings in output will contain the same
+             character in position `n`.
+             Otherwise, they will contain different letters at pos `n`, indicating a 50-50 split at that pos.
     """
     # Filter so that only sequences of the most common length are kept
     # (This filters out corruptions caused by missing or "extra" bases)
