@@ -69,6 +69,7 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
     bits_per_word = 5   # Hard-coded here as the transcode module is implemented specifically for a 5-bit word
     droplet_generator = DropletGenerator(input_seq, bits_per_word, seed_length)
     oligomers = encode(droplet_generator)
+
     # inject errors
     replacement_errors = inject_substitution_error(oligomers, sub_error_prob)
     if print_messages:
@@ -80,12 +81,23 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
     if print_messages:
         print("Insertion errors injected: " + str(insertion_errors))
         print("Total errors: " + str(replacement_errors + deletion_errors + insertion_errors))
+
     # decode
     sequenced_oligomers = sequence_droplet(oligomers)
+    if not sequenced_oligomers:
+        if print_messages:
+            print("Could not sequence oligomers, probably due to extreme data corruption")
+        return ""
     segment_idxs = [droplet_generator.find_segments(entry) for entry in sequenced_oligomers]
     data = [seq[droplet_generator.seed_binary_length:] for seq in sequenced_oligomers]
-    decoded_seq_bin = decode_data(data, segment_idxs)
+    try:
+        decoded_seq_bin = decode_data(data, segment_idxs)
+    except AssertionError:
+        if print_messages:
+            print("Decoding failed due to mathematical inconsistency")
+        return ""
     decoded_seq =  np_binary_to_str(decoded_seq_bin)
+
     # print success/failure
     if print_messages:
         if decoded_seq == input_seq:
@@ -102,9 +114,9 @@ if __name__ == "__main__":
     # run_experiment(seed_length= 15, print_messages= True, sub_error_prob= 1e-3,
     #                      del_error_prob= 0, insert_error_prob= 0)
     successes = 0
-    total = 200
+    total = 100
     for _ in trange(total, desc="running experiments", dynamic_ncols=True):
-        if EXAMPLE_SEQUENCE == run_experiment(seed_length=15, print_messages=False, sub_error_prob=5e-3,
-                                              del_error_prob=0, insert_error_prob=0):
+        if EXAMPLE_SEQUENCE == run_experiment(seed_length=15, print_messages=False, sub_error_prob=0,
+                                              del_error_prob=0.2, insert_error_prob=0):
             successes += 1
     print(str(successes) + " successful tests out of " + str(total))
