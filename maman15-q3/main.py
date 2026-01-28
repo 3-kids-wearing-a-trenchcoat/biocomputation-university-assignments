@@ -34,7 +34,7 @@ EXAMPLE_SEQUENCE: str = ("000111111000101100001000000010000010111000010010100111
 # functions
 def encode(generator: DropletGenerator, copies_per_oligomer: int = COPIES_PER_OLIGOMER) -> List[str]:
     """
-    Encode data sequence as droplets, multiply them each and shuffle them.
+    Encode data sequence as droplets, multiply them and shuffle.
     :param generator: DropletGenerator
     :param copies_per_oligomer: How many copies of each generated oligomer should be in the final output
     :return: List of strings representing DNA sequences
@@ -43,7 +43,19 @@ def encode(generator: DropletGenerator, copies_per_oligomer: int = COPIES_PER_OL
     shuffle(oligomers)
     return oligomers
 
-def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5, seed_length: int|None = None):
+def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = None,
+                   print_messages: bool = True) -> str:
+    """
+    Run a round-trip, DNA-storage experiment on the input data.
+    Encode the input sequence into droplets, generate strands from the droplets, multiply the strands,
+    shuffle them and then decode the message.
+    :param input_seq: Data to be encoded into DNA, given as a string made up only of characters '0' and '1'
+    :param seed_length: Maximum length of the binary representation of the seed.
+                        If the calculated needed seed length is smaller, that smaller value will be used.
+    :param print_messages: Whether to print messages detailing success or failure of the experiment
+    :return: The decoded message in the form of a string of characters '0' and '1'
+    """
+    bits_per_word = 5   # Hard-coded here as the transcode module is implemented specifically for a 5-bit word
     droplet_generator = DropletGenerator(input_seq, bits_per_word, seed_length)
     oligomers = encode(droplet_generator)
     sequenced_oligomers = sequence_droplet(oligomers)
@@ -53,15 +65,16 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5, se
     decoded_seq_bin = decode_data(data, segment_idxs)
     decoded_seq =  np_binary_to_str(decoded_seq_bin)
 
-    if decoded_seq == input_seq:
-        print("input sequence and output sequence are identical!")
-    else:
-        print("SEQUENCE MISMATCH!!")
-        print("input:")
-        print(input_seq)
-        print("output:")
-        print(decoded_seq)
-
+    if print_messages:
+        if decoded_seq == input_seq:
+            print("input sequence and output sequence are identical!")
+        else:
+            print("SEQUENCE MISMATCH!!")
+            print("input:")
+            print(input_seq)
+            print("output:")
+            print(decoded_seq)
+    return decoded_seq
 
 if __name__ == "__main__":
-    run_experiment(seed_length=15)
+    print(run_experiment(seed_length=15, print_messages=True))
