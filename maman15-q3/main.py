@@ -43,8 +43,8 @@ def encode(generator: DropletGenerator, copies_per_oligomer: int = COPIES_PER_OL
     shuffle(oligomers)
     return oligomers
 
-def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5):
-    droplet_generator = DropletGenerator(input_seq, bits_per_word)
+def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5, seed_length: int|None = None):
+    droplet_generator = DropletGenerator(input_seq, bits_per_word, seed_length)
     oligomers = encode(droplet_generator)
     sequenced_oligomers = sequence_droplet(oligomers)
 
@@ -64,4 +64,4 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, bits_per_word: int = 5):
 
 
 if __name__ == "__main__":
-    run_experiment()
+    run_experiment(seed_length=15)

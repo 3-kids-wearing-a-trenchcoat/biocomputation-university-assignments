@@ -39,7 +39,7 @@ def calc_number_of_seeds(segment_num: int, bits_per_word: int = 5) -> Tuple[int,
 
 class DropletGenerator:
     # TODO: (extended?) Hamming code error correction
-    def __init__(self, input_seq: str, bits_per_word: int = 5):
+    def __init__(self, input_seq: str, bits_per_word: int = 5, seed_length_limit: int|None = None):
         """
         Initialize the droplet generator.
         Split the input sequence into segments, convert each to a boolean numpy array and initialize the static
@@ -50,13 +50,17 @@ class DropletGenerator:
         # TODO: seed length can probably be smaller and explicitly defined as input
         if len(input_seq) % bits_per_word != 0:
             raise ValueError("length of the input sequence is not divisible by bits_per_word")
+        if seed_length_limit is not None and seed_length_limit % bits_per_word != 0:
+            raise ValueError("Seed length limit must be divisible by bits_per_word")
         self.rng = np.random.default_rng(MASTER_SEED)
         # split input sequence (str) into unique, equal-length sequences (np.bool)
         str_segments = parse_sequence.split_into_unique_segments(input_seq, bits_per_word)
         self.segments = parse_sequence.convert_segments_to_bool_ndarrays(str_segments)
         self.seg_idx = np.arange(len(self.segments)).astype(IDX_DTYPE)
         # Calculate number of different seed values needed and the binary length needed to express them all
-        self.seed_num, self.seed_binary_length = calc_number_of_seeds(len(self.segments), bits_per_word)
+        _, self.seed_binary_length = calc_number_of_seeds(len(self.segments), bits_per_word)
+        if seed_length_limit is not None and seed_length_limit < self.seed_binary_length:
+            self.seed_binary_length = seed_length_limit
         self.used_barcode_values = set()
         # I am working with the assumption that seed_binary_length, BARCODE_BITS
         # and the sequence length are all divisible by bits_per_word, meaning so is the concatenated droplet sequence
@@ -90,8 +94,6 @@ class DropletGenerator:
         :return: boolean NDArray representing the binary sequence
         """
         # Choose seed for droplet
-        # seed = int(self.rng.integers(0, self.seed_num))
-        # seed_bin = parse_sequence.uint_to_binary(seed, self.seed_binary_length)
         seed_bin = self.rng.choice([True, False], self.seed_binary_length)
         seed = parse_sequence.binary_to_uint(seed_bin)
 
