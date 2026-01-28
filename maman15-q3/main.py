@@ -4,6 +4,7 @@ from typing import List
 from decoder import sequence_droplet, decode_data
 from parse_sequence import np_binary_to_str
 from random import shuffle
+from error_generator import inject_substitution_error
 
 #constants
 COPIES_PER_OLIGOMER = 100
@@ -44,7 +45,8 @@ def encode(generator: DropletGenerator, copies_per_oligomer: int = COPIES_PER_OL
     return oligomers
 
 def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = None,
-                   print_messages: bool = True) -> str:
+                   sub_error_prob: float = 0, del_error_prob: float = 0, insert_error_prob: float = 0,
+                   print_messages: bool = True,) -> str:
     """
     Run a round-trip, DNA-storage experiment on the input data.
     Encode the input sequence into droplets, generate strands from the droplets, multiply the strands,
@@ -52,14 +54,25 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
     :param input_seq: Data to be encoded into DNA, given as a string made up only of characters '0' and '1'
     :param seed_length: Maximum length of the binary representation of the seed.
                         If the calculated needed seed length is smaller, that smaller value will be used.
-    :param print_messages: Whether to print messages detailing success or failure of the experiment
+    :param sub_error_prob: probability of each base in each oligomer to be substituted for the wrong base.
+                           Expected values in range [0,1]. defaults to 0.
+    :param del_error_prob: probability of each base in each oligomer to be deleted.
+                           Expected values in range [0,1]. defaults to 0.
+    :param insert_error_prob: probability of each space in an oligomer (between bases, before first base
+                              or after last base) to have a base added to it.
+                              Expected values in range [0,1]. defaults to 0.
+    :param print_messages: Whether to print messages
     :return: The decoded message in the form of a string of characters '0' and '1'
     """
     bits_per_word = 5   # Hard-coded here as the transcode module is implemented specifically for a 5-bit word
     droplet_generator = DropletGenerator(input_seq, bits_per_word, seed_length)
     oligomers = encode(droplet_generator)
-    sequenced_oligomers = sequence_droplet(oligomers)
 
+    replacement_errors = inject_substitution_error(oligomers, sub_error_prob)
+    if print_messages:
+        print("Replacement errors injected: " + str(replacement_errors))
+
+    sequenced_oligomers = sequence_droplet(oligomers)
     segment_idxs = [droplet_generator.find_segments(entry) for entry in sequenced_oligomers]
     data = [seq[droplet_generator.seed_binary_length:] for seq in sequenced_oligomers]
     decoded_seq_bin = decode_data(data, segment_idxs)
@@ -77,4 +90,4 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
     return decoded_seq
 
 if __name__ == "__main__":
-    print(run_experiment(seed_length=15, print_messages=True))
+    print(run_experiment(seed_length=15, print_messages=True, sub_error_prob= 1e-6))
