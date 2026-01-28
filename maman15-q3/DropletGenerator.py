@@ -37,7 +37,6 @@ def calc_number_of_seeds(segment_num: int, bits_per_word: int = 5) -> Tuple[int,
 
 
 class DropletGenerator:
-    # TODO: (extended?) Hamming code error correction
     def __init__(self, input_seq: str, bits_per_word: int = 5, seed_length_limit: int|None = None):
         """
         Initialize the droplet generator.
