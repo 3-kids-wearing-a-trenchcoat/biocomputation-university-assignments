@@ -90,8 +90,10 @@ class DropletGenerator:
         :return: boolean NDArray representing the binary sequence
         """
         # Choose seed for droplet
-        seed = int(self.rng.integers(0, self.seed_num))
-        seed_bin = parse_sequence.uint_to_binary(seed, self.seed_binary_length)
+        # seed = int(self.rng.integers(0, self.seed_num))
+        # seed_bin = parse_sequence.uint_to_binary(seed, self.seed_binary_length)
+        seed_bin = self.rng.choice([True, False], self.seed_binary_length)
+        seed = parse_sequence.binary_to_uint(seed_bin)
 
         droplet_rng = np.random.default_rng(seed)
         # randomly choose INDEX OF rank and then choose SEGMENT INDEXES accordingly
