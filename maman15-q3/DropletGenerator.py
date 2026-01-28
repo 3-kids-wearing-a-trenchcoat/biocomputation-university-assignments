@@ -28,7 +28,6 @@ def calc_number_of_seeds(segment_num: int, bits_per_word: int = 5) -> Tuple[int,
              1. Number of possible seeds that a droplet should choose
              2. Number of bits needed to represent these values
     """
-    # TODO: divisor should be specified rather than baked in as 5
     seg_permutations = sum([comb(segment_num, rank) for rank in POSSIBLE_RANKS])
     binary_rep_length = ceil(log2(seg_permutations))
     # round binary_rep_length up to nearest multiple of 5, to keep resulting droplet sequences of length
@@ -47,7 +46,6 @@ class DropletGenerator:
         :param input_seq: string made up only of the characters '0' and '1', representing the binary input sequence
         :param bits_per_word: number of bits used to represent a word in the language
         """
-        # TODO: seed length can probably be smaller and explicitly defined as input
         if len(input_seq) % bits_per_word != 0:
             raise ValueError("length of the input sequence is not divisible by bits_per_word")
         if seed_length_limit is not None and seed_length_limit % bits_per_word != 0:
