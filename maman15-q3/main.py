@@ -110,13 +110,23 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
             print(decoded_seq)
     return decoded_seq
 
+
 if __name__ == "__main__":
-    # run_experiment(seed_length= 15, print_messages= True, sub_error_prob= 1e-3,
-    #                      del_error_prob= 0, insert_error_prob= 0)
     successes = 0
-    total = 100
+    total = 400
+    seq = EXAMPLE_SEQUENCE
+    seed_length = 15
+    sub_error = 1e-3
+    del_error = 3e-6
+    ins_error = 2e-6
+
+    # single run - printing in-process messages
+    print("=====SINGLE TEST=====")
+    run_experiment(seq, seed_length, sub_error, del_error, ins_error, True)
+
+    print("=====" + str(total) + " CONSECUTIVE TESTS=====")
+    # several consecutive runs - don't print in-process messages - print number of successes in the end
     for _ in trange(total, desc="running experiments", dynamic_ncols=True):
-        if EXAMPLE_SEQUENCE == run_experiment(seed_length=15, print_messages=False, sub_error_prob=1e-4,
-                                              del_error_prob=1e-4, insert_error_prob=0):
+        if EXAMPLE_SEQUENCE == run_experiment(seq, seed_length, sub_error, del_error, ins_error, False):
             successes += 1
     print(str(successes) + " successful tests out of " + str(total))
