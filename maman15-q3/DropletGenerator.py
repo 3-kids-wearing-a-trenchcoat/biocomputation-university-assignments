@@ -19,10 +19,11 @@ DISALLOWED_LETTERS_IN_BARCODE = {"Y", "Z"}   # limit barcode letters to those th
 ALLOWED_BARCODE_BIN = [entry[1] for entry in transcode.WORD_BIT_PAIRS
                        if not any(forbidden in entry[0] for forbidden in DISALLOWED_LETTERS_IN_BARCODE)]
 
-def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
+def calc_number_of_seeds(segment_num: int, bits_per_word: int = 5) -> Tuple[int, int]:
     """
     Calculate the number of possible seeds a droplet can choose as a function of the number of segments
     :param segment_num: number of segments the input sequence was divided to
+    :param bits_per_word: length of binary representation of each word in the language
     :return: Tuple containing these two ints in order:
              1. Number of possible seeds that a droplet should choose
              2. Number of bits needed to represent these values
@@ -32,7 +33,7 @@ def calc_number_of_seeds(segment_num: int) -> Tuple[int, int]:
     binary_rep_length = ceil(log2(seg_permutations))
     # round binary_rep_length up to nearest multiple of 5, to keep resulting droplet sequences of length
     # divisible by 5.
-    binary_rep_length += (5 - binary_rep_length) % 5
+    binary_rep_length += (bits_per_word - binary_rep_length) % bits_per_word
     return seg_permutations, binary_rep_length
 
 
@@ -54,8 +55,8 @@ class DropletGenerator:
         str_segments = parse_sequence.split_into_unique_segments(input_seq, bits_per_word)
         self.segments = parse_sequence.convert_segments_to_bool_ndarrays(str_segments)
         self.seg_idx = np.arange(len(self.segments)).astype(IDX_DTYPE)
-        # Calculate number of seeds needed and choose that many seeds randomly
-        self.seed_num, self.seed_binary_length = calc_number_of_seeds(len(self.segments))
+        # Calculate number of different seed values needed and the binary length needed to express them all
+        self.seed_num, self.seed_binary_length = calc_number_of_seeds(len(self.segments), bits_per_word)
         self.used_barcode_values = set()
         # I am working with the assumption that seed_binary_length, BARCODE_BITS
         # and the sequence length are all divisible by bits_per_word, meaning so is the concatenated droplet sequence
