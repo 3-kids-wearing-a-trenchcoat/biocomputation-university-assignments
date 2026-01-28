@@ -67,10 +67,10 @@ def elimination_step(A: NDArray[np.bool], Y: NDArray[np.bool], pivot_row: int, p
             Y[r] ^= Y[pivot_row]
     return True
 
-def gauss_jordan_elimination(A_in: NDArray[np.bool], Y_in: NDArray[np.bool]) -> NDArray[np.bool] | None:
+def gauss_jordan_elimination(A_in: NDArray[np.bool], Y_in: NDArray[np.bool]) -> NDArray[np.bool]:
     """
     Solve the linear equation Ax=Y via row reduction on the augmented matrix [A|Y]
-    :return: x if Ax=Y has a unique solution, otherwise None.
+    :return: x if Ax=Y has a unique solution, otherwise raise assertion error.
     """
     # apply reduction
     A, Y = A_in.copy(), Y_in.copy()
@@ -83,8 +83,7 @@ def gauss_jordan_elimination(A_in: NDArray[np.bool], Y_in: NDArray[np.bool]) -> 
 
     # Y should now equal x, validate result
     for row in range(A.shape[0]):
-        if np.all(A[row] == 0) and np.any(Y[row] != 0):
-            return None
+        assert np.all(A[row] == 0) and np.any(Y[row] != 0)
 
     # Remove all zero rows from Y before returning it
     non_zero_rows_mask = np.any(A, axis=1)
