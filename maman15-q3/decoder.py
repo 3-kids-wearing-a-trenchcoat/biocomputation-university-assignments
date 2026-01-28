@@ -85,6 +85,7 @@ def sequence_droplet(sequences: List[str], min_in_cluster: int = MIN_IN_CLUSTER)
     # Divide sequences into clusters by their barcode prefix. (
     clusters = parse_sequence.bucket_strings_by_prefix(sequences, BARCODE_BASES, True)
     output: List[NDArray[np.bool]] = []
+    max_length = 0
     for bucket in clusters.values():
         if len(bucket) < min_in_cluster:
             continue    # ignore buckets below the minimum size
@@ -102,9 +103,13 @@ def sequence_droplet(sequences: List[str], min_in_cluster: int = MIN_IN_CLUSTER)
             continue
         try:
             output.append(transcode.from_words_to_np(in_language))  # convert language into binary
+            if output[-1].size > max_length:
+                max_length = output[-1].size
         except KeyError:
             continue
-    return output
+    # return output
+    # prune all arrays that are not of the max size
+    return [entry for entry in output if entry.size == max_length]
 
 def decode_data(sequences: List[NDArray[np.bool]], segment_ids: List[NDArray[IDX_DTYPE]]) -> NDArray[np.bool]:
     """
