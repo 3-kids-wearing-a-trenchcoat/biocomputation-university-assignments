@@ -4,6 +4,7 @@ import numpy as np
 DEFAULT_PROB = 1e-6 # default error probability for any single event
 SUB_OPTIONS = {"T": ["G", "C", "A"], "G": ["T", "C", "A"],
                "C": ["T", "G", "A"], "A": ["T", "G", "C"]}
+CHAR_OPTIONS = ["T","G","C","A"]
 RNG = np.random.default_rng()
 
 def inject_substitution_error(input_list: List[str], prob: float = DEFAULT_PROB) -> int:
@@ -18,7 +19,6 @@ def inject_substitution_error(input_list: List[str], prob: float = DEFAULT_PROB)
         return 0
 
     total_errors = 0
-    # TODO: very inefficient, but may not be noticeable
     for i in range(len(input_list)):
         for j in range(len(input_list[i])):
             if RNG.random() <= prob:
@@ -44,4 +44,33 @@ def inject_deletion_error(input_list: List[str], prob: float = DEFAULT_PROB) -> 
         mask = (RNG.random(size=entry.size) > prob)
         input_list[i] = "".join(entry[mask].tolist())
         total_errors += np.count_nonzero(~mask)
+    return total_errors
+
+def inject_insertion_error(input_list: List[str], prob: float = DEFAULT_PROB) -> int:
+    """
+    Inject insertion errors in-place into the input list.
+    For every string in the list and for every possible "spot" in that string, there's a chance a character
+    will be added.
+    The possible "spots" are before the first char, after the last char or between any two adjacent characters.
+    :param input_list: List of strings that ay be subjected to errors
+    :param prob: Probability in [0,1] for a character to be added to a "spot"
+    :return: Total number of errors injected into the list
+    """
+    if prob == 0:
+        return 0
+
+    total_errors = 0
+    for i, entry in enumerate(input_list):
+        n = len(entry)
+        new_entry_chars = []
+
+        for j in range(n+1):
+            if RNG.random() < prob: # if random insertion error happened here
+                new_entry_chars.append(RNG.choice(CHAR_OPTIONS))
+                total_errors += 1
+            if j < n:               # if we're not past the last original character
+                new_entry_chars.append(entry[j])
+
+        input_list[i] = "".join(new_entry_chars)
+
     return total_errors

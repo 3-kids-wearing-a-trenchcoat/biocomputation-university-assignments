@@ -4,7 +4,7 @@ from typing import List
 from decoder import sequence_droplet, decode_data
 from parse_sequence import np_binary_to_str
 from random import shuffle
-from error_generator import inject_substitution_error, inject_deletion_error
+from error_generator import inject_substitution_error, inject_deletion_error, inject_insertion_error
 
 #constants
 COPIES_PER_OLIGOMER = 100
@@ -64,23 +64,28 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
     :param print_messages: Whether to print messages
     :return: The decoded message in the form of a string of characters '0' and '1'
     """
+    # encode data into droplets
     bits_per_word = 5   # Hard-coded here as the transcode module is implemented specifically for a 5-bit word
     droplet_generator = DropletGenerator(input_seq, bits_per_word, seed_length)
     oligomers = encode(droplet_generator)
-
+    # inject errors
     replacement_errors = inject_substitution_error(oligomers, sub_error_prob)
     if print_messages:
         print("Replacement errors injected: " + str(replacement_errors))
     deletion_errors = inject_deletion_error(oligomers, del_error_prob)
     if print_messages:
         print("Deletion errors injected: " + str(deletion_errors))
-
+    insertion_errors = inject_insertion_error(oligomers, insert_error_prob)
+    if print_messages:
+        print("Insertion errors injected: " + str(insertion_errors))
+        print("Total errors: " + str(replacement_errors + deletion_errors + insertion_errors))
+    # decode
     sequenced_oligomers = sequence_droplet(oligomers)
     segment_idxs = [droplet_generator.find_segments(entry) for entry in sequenced_oligomers]
     data = [seq[droplet_generator.seed_binary_length:] for seq in sequenced_oligomers]
     decoded_seq_bin = decode_data(data, segment_idxs)
     decoded_seq =  np_binary_to_str(decoded_seq_bin)
-
+    # print success/failure
     if print_messages:
         if decoded_seq == input_seq:
             print("input sequence and output sequence are identical!")
@@ -93,5 +98,5 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
     return decoded_seq
 
 if __name__ == "__main__":
-    print(run_experiment(seed_length=15, print_messages=True, sub_error_prob= 1e-6,
-                         del_error_prob=1e-6))
+    print(run_experiment(seed_length=55, print_messages=True, sub_error_prob= 1e-5,
+                         del_error_prob=1e-5, insert_error_prob=1e-5))
