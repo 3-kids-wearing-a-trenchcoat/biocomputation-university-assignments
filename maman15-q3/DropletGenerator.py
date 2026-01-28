@@ -14,7 +14,7 @@ MASTER_SEED = 43523345234
 BARCODE_BASES = 10        # number of bases that make up each barcode, a base is effectively equivalent to 2-bits
 BARCODE_BITS = ceil((BARCODE_BASES / 2) * 5)
 BARCODE_UPPER_BOUND = 2 ** BARCODE_BITS    # Max decimal value of a barcode
-BULK_GENERATION_OVERHEAD = 0.05
+BULK_GENERATION_OVERHEAD = 0.15
 DISALLOWED_LETTERS_IN_BARCODE = {"Y", "Z"}   # limit barcode letters to those that are not 50-50 rep in DNA
 ALLOWED_BARCODE_BIN = [entry[1] for entry in transcode.WORD_BIT_PAIRS
                        if not any(forbidden in entry[0] for forbidden in DISALLOWED_LETTERS_IN_BARCODE)]
@@ -114,7 +114,7 @@ class DropletGenerator:
         """
         Generate several droplets at once using gen_droplet.
         :param n: Number of droplets to generate.
-                  If 'None'; generates ceil[1.05 * num_of_segments] droplets
+                  If 'None'; generates ceil[BULK_GENERATION_OVERHEAD * num_of_segments] droplets
         :param in_language: Whether to return the output in the language
         :return: List of boolean numpy arrays representing sequences if in_language is 'False'.
                  if in_language is 'True', return a list of strings representing sequences.
