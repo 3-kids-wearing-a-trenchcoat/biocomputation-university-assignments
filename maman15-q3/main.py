@@ -5,6 +5,7 @@ from decoder import sequence_droplet, decode_data
 from parse_sequence import np_binary_to_str
 from random import shuffle
 from error_generator import inject_substitution_error, inject_deletion_error, inject_insertion_error
+from tqdm import trange
 
 #constants
 COPIES_PER_OLIGOMER = 100
@@ -98,5 +99,12 @@ def run_experiment(input_seq: str = EXAMPLE_SEQUENCE, seed_length: int|None = No
     return decoded_seq
 
 if __name__ == "__main__":
-    print(run_experiment(seed_length=55, print_messages=True, sub_error_prob= 1e-5,
-                         del_error_prob=1e-5, insert_error_prob=1e-5))
+    # run_experiment(seed_length= 15, print_messages= True, sub_error_prob= 1e-3,
+    #                      del_error_prob= 0, insert_error_prob= 0)
+    successes = 0
+    total = 200
+    for _ in trange(total, desc="running experiments", dynamic_ncols=True):
+        if EXAMPLE_SEQUENCE == run_experiment(seed_length=15, print_messages=False, sub_error_prob=5e-3,
+                                              del_error_prob=0, insert_error_prob=0):
+            successes += 1
+    print(str(successes) + " successful tests out of " + str(total))
