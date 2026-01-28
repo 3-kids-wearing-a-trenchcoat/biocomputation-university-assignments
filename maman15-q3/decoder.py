@@ -72,10 +72,12 @@ def _build_by_consensus(sequences) -> Tuple[str, str]:
         out_list_a.append(a_addition), out_list_b.append(b_addition)
     return "".join(out_list_a), "".join(out_list_b)
 
-def sequence_droplet(sequences: List[str]) -> List[NDArray[np.bool]]:
+def sequence_droplet(sequences: List[str], min_in_cluster: int = MIN_IN_CLUSTER) -> List[NDArray[np.bool]]:
     """
     Generate the segments encoded in this droplet.
     :param sequences: Sequences to decode
+    :param min_in_cluster: clusters that have fewer than this many members are discarded as noise.
+                           defaults to MIN_IN_CLUSTER.
     :return: List of boolean numpy arrays, each is the binary representation of a segment.
              The barcode portion of each binary representation has been removed, as it is not needed
              beyond this process.
@@ -84,7 +86,7 @@ def sequence_droplet(sequences: List[str]) -> List[NDArray[np.bool]]:
     clusters = parse_sequence.bucket_strings_by_prefix(sequences, BARCODE_BASES, True)
     output: List[NDArray[np.bool]] = []
     for bucket in clusters.values():
-        if len(bucket) < MIN_IN_CLUSTER:
+        if len(bucket) < min_in_cluster:
             continue    # ignore buckets below the minimum size
         strand1, strand2 = _build_by_consensus(bucket)  # recreate the two representative DNA strands via consensus
         try:
